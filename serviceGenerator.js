@@ -9,7 +9,7 @@ module.exports = class extends Generator {
       default: 'auth' 
     }]).then((answers) => {
       this.serviceName = answers.name;
-    });
+    }); // testing comment
   }
 
   writing() {
