@@ -6,7 +6,7 @@ module.exports = class extends Generator {
       type: 'input',
       name: 'name',
       message: 'Your microservice name',
-      default: 'auth' // Default to 'auth'
+      default: 'auth' 
     }]).then((answers) => {
       this.serviceName = answers.name;
     });
