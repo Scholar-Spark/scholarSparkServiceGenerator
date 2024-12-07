@@ -26,13 +26,21 @@ A Yeoman generator for creating microservices with ease.
    npm install
    ```
 
-3. **Link the Generator Globally**: Use npm link to make the generator available globally.
+3. **Link the Generator Globally**: Use npm link to make the generator available globally. This step is crucial for development, as it allows you to test your generator as if it were installed globally.
 
    ```bash
    npm link
    ```
 
-   This command creates a symlink in the global `node_modules` directory, allowing you to use the generator from anywhere.
+   - **Note**: Run this command from the root of your generator project (inside the `generator-scholarspark-service/` folder). This will install your project dependencies and create a symlink from the global `node_modules` directory to your local project.
+
+4. **Verify the Installation**: To ensure the generator is correctly linked, you can list all available generators:
+
+   ```bash
+   yo --generators
+   ```
+
+   You should see `scholarspark-service` listed among the available generators.
 
 ## Usage
 
