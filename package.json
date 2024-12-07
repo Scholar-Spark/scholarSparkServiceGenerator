@@ -1,0 +1,17 @@
+{
+  "name": "Scholarspark-service-generator",
+  "version": "1.0.0",
+  "description": "A Yeoman generator for creating microservices",
+  "main": "serviceGenerator.js",
+  "bin": {
+    "generate-service": "serviceGenerator.js"
+  },
+  "dependencies": {
+    "yeoman-generator": "^5.0.0"
+  },
+  "keywords": [
+    "yeoman-generator"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
