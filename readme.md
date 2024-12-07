@@ -44,4 +44,38 @@ A Yeoman generator for creating microservices with ease.
 
 ## Usage
 
-Once installed, you can use the generator to create a new microservice:
+Once the generator is installed and linked globally, you can use it to scaffold a new microservice project. Follow these steps:
+
+1. **Navigate to Your Desired Directory**: Open a terminal and navigate to the directory where you want to create your new microservice project.
+
+   ```bash
+   cd /path/to/your/projects
+   ```
+
+2. **Run the Generator**: Use the `yo` command followed by the generator name to start the scaffolding process. For this generator, the command is:
+
+   ```bash
+   yo scholarspark-service
+   ```
+
+3. **Follow the Prompts**: The generator will prompt you for information needed to set up your microservice. This typically includes:
+
+   - **Microservice Name**: Enter a name for your microservice. This name will be used to create directories and files specific to your service.
+   - **Additional Configuration**: Depending on how the generator is set up, you may be asked for additional configuration options, such as database settings, API endpoints, or authentication methods.
+
+4. **Project Creation**: Once you've provided the necessary information, the generator will create a new directory with the structure and files needed for your microservice. This includes:
+
+   - **Service Files**: Core service files, such as controllers, models, and routes.
+   - **Configuration Files**: Environment and configuration files, such as `.env` and `config.js`.
+   - **Documentation**: Basic documentation files, such as `README.md`.
+
+5. **Verify the Setup**: After the generator completes, navigate into your new project directory and verify that all files and directories have been created as expected.
+
+   ```bash
+   cd your-microservice-name
+   ls
+   ```
+
+6. **Start Developing**: You can now start developing your microservice. Open the project in your favorite code editor and begin customizing it to meet your needs.
+
+By following these steps, you can quickly set up a new microservice project using the Scholarspark Service Generator, allowing you to focus on building features rather than setting up boilerplate code.
