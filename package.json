@@ -4,7 +4,7 @@
   "description": "A Yeoman generator for creating microservices",
   "main": "serviceGenerator.js",
   "bin": {
-    "generate-service": "serviceGenerator.js"
+    "scholarspark-service": "serviceGenerator.js"
   },
   "dependencies": {
     "yeoman-generator": "^5.0.0"
