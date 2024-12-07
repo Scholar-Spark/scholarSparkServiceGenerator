@@ -20,17 +20,19 @@ A Yeoman generator for creating microservices with ease.
    cd <your-repo-directory>
    ```
 
-2. **Run the Setup Script**: Execute the setup script to configure the global npm directory and link the generator globally.
+2. **Install Dependencies**: Run npm install to install the necessary dependencies.
 
    ```bash
-   ./setup_global.sh
+   npm install
    ```
 
-   This script will:
+3. **Link the Generator Globally**: Use npm link to make the generator available globally.
 
-   - Set up a user-writable npm global directory.
-   - Add the directory to your `PATH`.
-   - Install dependencies and link the generator globally.
+   ```bash
+   npm link
+   ```
+
+   This command creates a symlink in the global `node_modules` directory, allowing you to use the generator from anywhere.
 
 ## Usage
 
