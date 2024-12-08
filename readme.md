@@ -69,13 +69,29 @@ Once the generator is installed and linked globally, you can use it to scaffold 
    - **Configuration Files**: Environment and configuration files, such as `.env` and `config.js`.
    - **Documentation**: Basic documentation files, such as `README.md`.
 
-5. **Verify the Setup**: After the generator completes, navigate into your new project directory and verify that all files and directories have been created as expected.
+5. **Set Up the Project with Poetry**: If your project uses Python, it's recommended to use Poetry for dependency management and virtual environment setup.
+
+   - **Install Poetry**: If you haven't already, install Poetry by following the instructions at [python-poetry.org](https://python-poetry.org/docs/#installation).
+
+   - **Initialize the Project**: Navigate into your project directory and use Poetry to install dependencies and set up the environment.
+
+     ```bash
+     cd your-microservice-name
+     poetry install
+     ```
+
+   - **Activate the Virtual Environment**: Poetry automatically manages virtual environments. To activate it, use:
+
+     ```bash
+     poetry shell
+     ```
+
+6. **Verify the Setup**: After the generator completes, navigate into your new project directory and verify that all files and directories have been created as expected.
 
    ```bash
-   cd your-microservice-name
    ls
    ```
 
-6. **Start Developing**: You can now start developing your microservice. Open the project in your favorite code editor and begin customizing it to meet your needs.
+7. **Start Developing**: You can now start developing your microservice. Open the project in your favorite code editor and begin customizing it to meet your needs.
 
-By following these steps, you can quickly set up a new microservice project using the Scholarspark Service Generator, allowing you to focus on building features rather than setting up boilerplate code.
+By following these steps, you can quickly set up a new microservice project using the Scholarspark Service Generator and Poetry, allowing you to focus on building features rather than setting up boilerplate code.
