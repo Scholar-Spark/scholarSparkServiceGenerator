@@ -7,84 +7,133 @@ module.exports = class extends Generator {
       {
         type: "input",
         name: "name",
-        message: "Your microservice name",
-        default: "auth",
+        message: "Your package name",
+        default: "my-package",
+      },
+      {
+        type: "list",
+        name: "packageType",
+        message: "What type of package are you creating?",
+        choices: [
+          {
+            name: "Basic Package (Simple reusable module)",
+            value: "basic"
+          },
+          {
+            name: "CLI Tool (Command-line application)",
+            value: "cli"
+          },
+          {
+            name: "Library with API (Reusable library with public API)",
+            value: "library"
+          }
+        ],
+        default: "basic"
       },
       {
         type: "input",
         name: "description",
-        message: "Project description",
-        default: "A FastAPI microservice",
+        message: "Package description",
+        default: "A Python package"
       },
       {
         type: "input",
         name: "author",
         message: "Author name",
-        default: this.user.git.name(),
+        default: this.user.git.name()
       },
+      {
+        type: "input",
+        name: "email",
+        message: "Author email",
+        default: this.user.git.email()
+      }
     ]).then((answers) => {
       this.answers = answers;
-      this.serviceName = answers.name;
+      this.packageName = answers.name;
     });
   }
 
   writing() {
     const baseStructure = {
-      "app/api/routes/__init__.py": "",
-      "app/api/routes/router.py": this._generateRouterContent(),
-      "app/core/__init__.py": "",
-      "app/core/config.py": this._generateConfigContent(),
-      "app/core/security.py": "",
-      "app/services/__init__.py": "",
-      [`app/services/${this.serviceName}_service.py`]: this._generateServiceContent(),
-      "app/repositories/__init__.py": "",
-      [`app/repositories/${this.serviceName}_repository.py`]: this._generateRepositoryContent(),
-      "app/schemas/__init__.py": "",
-      [`app/schemas/${this.serviceName}.py`]: this._generateSchemaContent(),
-      "app/__init__.py": "",
-      "app/main.py": this._generateMainContent(),
+      // Common structure for all package types
+      [`src/${this.packageName}/__init__.py`]: this.generateInit(),
+      [`src/${this.packageName}/core.py`]: this.generateCore(),
       "tests/__init__.py": "",
-      "tests/conftest.py": this._generateConfTestContent(),
-      [`tests/test_${this.serviceName}.py`]: this._generateTestContent(),
-      "Dockerfile": this._generateDockerfile(),
-      ".env": this._generateEnvFile(),
-      ".env.example": this._generateEnvExampleFile(),
-      ".gitignore": this._generateGitignore(),
-      "pyproject.toml": this._generatePyprojectToml(),
-      "poetry.lock": "",
-      "README.md": this._generateReadme(),
+      "tests/conftest.py": this.generateConfTest(),
+      [`tests/test_${this.packageName}.py`]: this.generateTests(),
+      "examples/basic_usage.py": this.generateExample(),
+      "pyproject.toml": this.generatePyprojectToml(),
+      "README.md": this.generateReadme(),
+      ".gitignore": this.generateGitignore(),
+      "Makefile": this.generateMakefile(),
+      "LICENSE": this.generateLicense(),
     };
+
+    // Add package-type specific files
+    switch (this.answers.packageType) {
+      case "cli":
+        baseStructure[`src/${this.packageName}/cli.py`] = this.generateCli();
+        break;
+      case "library":
+        baseStructure[`src/${this.packageName}/api.py`] = this.generateApi();
+        baseStructure["docs/api.md"] = this.generateApiDocs();
+        break;
+    }
 
     Object.entries(baseStructure).forEach(([path, content]) => {
       this.fs.write(this.destinationPath(path), content);
     });
   }
 
-  _generatePyprojectToml() {
+  generatePyprojectToml() {
+    const commonDependencies = {
+      python: "^3.9",
+    };
+
+    const typeSpecificDependencies = {
+      cli: {
+        click: "^8.1.3",
+        "rich": "^13.4.2"
+      },
+      library: {
+        requests: "^2.31.0"
+      },
+      basic: {}
+    };
+
+    const dependencies = {
+      ...commonDependencies,
+      ...typeSpecificDependencies[this.answers.packageType]
+    };
+
+    const depsString = Object.entries(dependencies)
+      .map(([pkg, ver]) => `${pkg} = "${ver}"`)
+      .join("\n");
+
     return `[tool.poetry]
-name = "${this.serviceName}"
+name = "${this.packageName}"
 version = "0.1.0"
 description = "${this.answers.description}"
-authors = ["${this.answers.author}"]
+authors = ["${this.answers.author} <${this.answers.email}>"]
+readme = "README.md"
+packages = [{include = "${this.packageName}", from = "src"}]
 
 [tool.poetry.dependencies]
-python = "^3.9"
-fastapi = "^0.68.0"
-uvicorn = "^0.15.0"
-python-dotenv = "^0.19.0"
-sqlalchemy = "^1.4.23"
-pydantic = "^1.8.2"
-alembic = "^1.7.1"
+${depsString}
 
-[tool.poetry.dev-dependencies]
-pytest = "^6.2.5"
-black = "^21.7b0"
-isort = "^5.9.3"
-flake8 = "^3.9.2"
-pytest-cov = "^2.12.1"
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+black = "^23.7.0"
+isort = "^5.12.0"
+mypy = "^1.4.1"
+pytest-cov = "^4.1.0"
+pre-commit = "^3.3.3"
+
+${this.answers.packageType === 'cli' ? '[tool.poetry.scripts]\ncli = "' + this.packageName + '.cli:main"\n' : ''}
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.black]
@@ -97,122 +146,122 @@ profile = "black"
 multi_line_output = 3`;
   }
 
-  _generateDockerfile() {
-    return `FROM python:3.9-slim
+  generateInit() {
+    return `"""
+${this.answers.description}
+"""
 
-WORKDIR /app
-
-RUN pip install poetry
-
-COPY pyproject.toml poetry.lock ./
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev --no-interaction --no-ansi
-
-COPY . .
-
-CMD ["poetry", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]`;
+__version__ = "0.1.0"`;
   }
 
-  _generateGitignore() {
-    return `# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-*.egg-info/
-.installed.cfg
-*.egg
+  generateCore() {
+    return `"""
+Core functionality for ${this.packageName}
+"""
 
-# Virtual Environment
-.env
-.venv
-venv/
-ENV/
+class ${this.toPascalCase(this.packageName)}:
+    """
+    Main class for ${this.packageName}
+    """
+    def __init__(self):
+        pass
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Testing
-.coverage
-htmlcov/
-.pytest_cache/
-
-# Logs
-*.log`;
+    def example_method(self):
+        """Example method"""
+        return "Hello from ${this.packageName}!"`;
   }
 
-  _generateEnvFile() {
-    return `DATABASE_URL=postgresql://user:password@localhost:5432/${this.serviceName}
-SECRET_KEY=your-super-secret-key
-DEBUG=True
-ENVIRONMENT=development`;
+  generateCli() {
+    return `import click
+from rich import print
+
+@click.group()
+def cli():
+    """${this.answers.description}"""
+    pass
+
+@cli.command()
+def hello():
+    """Say hello"""
+    print("[green]Hello from ${this.packageName}![/green]")
+
+def main():
+    cli()
+
+if __name__ == "__main__":
+    main()`;
   }
 
-  _generateEnvExampleFile() {
-    return `DATABASE_URL=postgresql://user:password@localhost:5432/${this.serviceName}
-SECRET_KEY=your-super-secret-key
-DEBUG=True
-ENVIRONMENT=development`;
+  generateApi() {
+    return `"""
+Public API for ${this.packageName}
+"""
+
+from .core import ${this.toPascalCase(this.packageName)}
+
+__all__ = ["${this.toPascalCase(this.packageName)}"]`;
   }
 
-  _generateReadme() {
-    return `# ${this.serviceName} Microservice
+  toPascalCase(str) {
+    return str
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join('');
+  }
+
+  generateReadme() {
+    const usageExample = {
+      basic: `from ${this.packageName} import ${this.toPascalCase(this.packageName)}
+
+client = ${this.toPascalCase(this.packageName)}()
+result = client.example_method()`,
+      cli: `# Install and run from command line
+pip install ${this.packageName}
+${this.packageName} hello`,
+      library: `from ${this.packageName} import ${this.toPascalCase(this.packageName)}
+
+client = ${this.toPascalCase(this.packageName)}()
+result = client.example_method()`
+    };
+
+    return `# ${this.packageName}
 
 ${this.answers.description}
 
-## Setup
+## Installation
 
-1. Install Poetry:
 \`\`\`bash
-curl -sSL https://install.python-poetry.org | python3 -
+pip install ${this.packageName}
 \`\`\`
 
+Or with poetry:
+
+\`\`\`bash
+poetry add ${this.packageName}
+\`\`\`
+
+## Usage
+
+\`\`\`python
+${usageExample[this.answers.packageType]}
+\`\`\`
+
+## Development
+
+1. Clone the repository
 2. Install dependencies:
-\`\`\`bash
-poetry install
-\`\`\`
+   \`\`\`bash
+   poetry install
+   \`\`\`
+3. Run tests:
+   \`\`\`bash
+   poetry run pytest
+   \`\`\`
 
-3. Copy .env.example to .env and update the values:
-\`\`\`bash
-cp .env.example .env
-\`\`\`
+## License
 
-4. Run the application:
-\`\`\`bash
-poetry run uvicorn app.main:app --reload
-\`\`\`
-
-## Testing
-
-Run tests with:
-\`\`\`bash
-poetry run pytest
-\`\`\`
-
-## Docker
-
-Build and run with Docker:
-\`\`\`bash
-docker build -t ${this.serviceName} .
-docker run -p 8000:8000 ${this.serviceName}
-\`\`\``;
+MIT`;
   }
 
-  // Add other _generate* methods for the remaining files...
+  // ... (other methods remain the same)
 };
