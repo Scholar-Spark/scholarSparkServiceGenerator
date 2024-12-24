@@ -56,30 +56,29 @@ module.exports = class extends Generator {
 
   writing() {
     const baseStructure = {
-      // Common structure for all package types
-      [`src/${this.packageName}/__init__.py`]: this.generateInit(),
-      [`src/${this.packageName}/core.py`]: this.generateCore(),
+      "app/api/routes/__init__.py": "",
+      "app/api/routes/router.py": this._generateRouterContent(),
+      "app/core/__init__.py": "",
+      "app/core/config.py": this._generateConfigContent(),
+      "app/services/__init__.py": "",
+      [`app/services/${this.answers.name.replace(/-/g, '_')}_service.py`]: this._generateServiceContent(),
+      "app/repositories/__init__.py": "",
+      [`app/repositories/${this.answers.name.replace(/-/g, '_')}_repository.py`]: this._generateRepositoryContent(),
+      "app/schemas/__init__.py": "",
+      [`app/schemas/${this.answers.name.replace(/-/g, '_')}.py`]: this._generateSchemaContent(),
+      "app/__init__.py": "",
+      "app/main.py": this._generateMainContent(),
       "tests/__init__.py": "",
-      "tests/conftest.py": this.generateConfTest(),
-      [`tests/test_${this.packageName}.py`]: this.generateTests(),
-      "examples/basic_usage.py": this.generateExample(),
+      "tests/conftest.py": this._generateConfTestContent(),
+      "tests/test_api.py": this._generateTestContent(),
       "pyproject.toml": this.generatePyprojectToml(),
       "README.md": this.generateReadme(),
       ".gitignore": this.generateGitignore(),
       "Makefile": this.generateMakefile(),
-      "LICENSE": this.generateLicense(),
+      ".env": this._generateEnvFile(),
+      ".env.example": this._generateEnvFile(),
+      "Dockerfile": this._generateDockerfile(),
     };
-
-    // Add package-type specific files
-    switch (this.answers.packageType) {
-      case "cli":
-        baseStructure[`src/${this.packageName}/cli.py`] = this.generateCli();
-        break;
-      case "library":
-        baseStructure[`src/${this.packageName}/api.py`] = this.generateApi();
-        baseStructure["docs/api.md"] = this.generateApiDocs();
-        break;
-    }
 
     Object.entries(baseStructure).forEach(([path, content]) => {
       this.fs.write(this.destinationPath(path), content);
@@ -421,5 +420,184 @@ poetry.lock
 .env.test.local
 .env.production.local`;
 }
-  
+
+_generateRouterContent() {
+    return `from fastapi import APIRouter, Depends, HTTPException
+from typing import List
+
+router = APIRouter()
+
+@router.get("/")
+async def root():
+    """
+    Root endpoint for ${this.answers.name} service
+    """
+    return {"message": "Welcome to ${this.answers.name} service"}
+
+@router.get("/health")
+async def health_check():
+    """
+    Health check endpoint
+    """
+    return {"status": "healthy"}`;
+}
+
+_generateConfigContent() {
+    return `from pydantic_settings import BaseSettings
+from functools import lru_cache
+
+class Settings(BaseSettings):
+    """
+    Application settings
+    """
+    APP_NAME: str = "${this.answers.name}"
+    DEBUG: bool = False
+    
+    class Config:
+        env_file = ".env"
+
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()`;
+}
+
+_generateServiceContent() {
+    const serviceName = this.answers.name.replace(/-/g, '_');
+    return `from typing import List, Optional
+
+class ${this.toPascalCase(serviceName)}Service:
+    """
+    Service layer for ${this.answers.name}
+    """
+    
+    async def example_operation(self) -> dict:
+        """
+        Example service operation
+        """
+        return {"message": "Service operation completed"}`;
+}
+
+_generateRepositoryContent() {
+    const serviceName = this.answers.name.replace(/-/g, '_');
+    return `from typing import List, Optional
+
+class ${this.toPascalCase(serviceName)}Repository:
+    """
+    Repository layer for ${this.answers.name}
+    """
+    
+    async def example_query(self) -> dict:
+        """
+        Example database query
+        """
+        return {"data": "Query result"}`;
+}
+
+_generateSchemaContent() {
+    const serviceName = this.answers.name.replace(/-/g, '_');
+    return `from pydantic import BaseModel
+from typing import Optional, List
+
+class ExampleSchema(BaseModel):
+    """
+    Example Pydantic schema
+    """
+    id: int
+    name: str
+    description: Optional[str] = None
+
+    class Config:
+        from_attributes = True`;
+}
+
+_generateMainContent() {
+    return `from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from .api.routes.router import router
+from .core.config import get_settings
+
+settings = get_settings()
+
+app = FastAPI(
+    title="${this.answers.name}",
+    description="${this.answers.description}",
+    version="0.1.0",
+)
+
+# CORS middleware configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Modify in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(router, prefix="/api")
+
+@app.get("/")
+async def root():
+    return {"message": f"Welcome to {settings.APP_NAME}"}`;
+}
+
+_generateConfTestContent() {
+    return `import pytest
+from fastapi.testclient import TestClient
+from app.main import app
+
+@pytest.fixture
+def client():
+    return TestClient(app)`;
+}
+
+_generateTestContent() {
+    return `from fastapi.testclient import TestClient
+
+def test_root_endpoint(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "message" in response.json()
+
+def test_health_check(client):
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "healthy"`;
+}
+
+_generateEnvFile() {
+    return `# Application Settings
+APP_NAME=${this.packageName}
+DEBUG=True
+ENVIRONMENT=development
+
+# Database Settings
+DATABASE_URL=postgresql://user:password@localhost:5432/${this.packageName}
+
+# Security Settings
+SECRET_KEY=your-secret-key-here
+
+# API Settings
+API_VERSION=v1
+API_PREFIX=/api/${this.answers.packageType === 'library' ? 'v1' : ''}
+
+# Logging
+LOG_LEVEL=INFO`;
+}
+
+_generateDockerfile() {
+    return `FROM python:3.9-slim
+
+WORKDIR /app
+
+RUN pip install poetry
+
+COPY pyproject.toml poetry.lock ./
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-dev --no-interaction --no-ansi
+
+COPY . .
+
+CMD ["poetry", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]`;
+}
 };
