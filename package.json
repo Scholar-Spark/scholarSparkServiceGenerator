@@ -1,14 +1,14 @@
 {
-  "name": "generator-scholarspark-service",
-  "version": "0.1.0",
-  "description": "",
+  "name": "generator-python-package",
+  "version": "1.0.0",
+  "description": "Yeoman generator for Python packages",
   "files": [
-    "services"
+    "generators"
   ],
   "keywords": [
     "yeoman-generator"
   ],
   "dependencies": {
-    "yeoman-generator": "^1.0.0"
+    "yeoman-generator": "^5.9.0"
   }
 }
