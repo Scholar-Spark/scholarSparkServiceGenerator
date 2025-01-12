@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 const Generator = require("yeoman-generator");
+const fs = require("fs");
+const path = require("path");
+
+// Suppress shelljs warnings
+process.env.SUPPRESS_NO_CONFIG_WARNING = "true";
 
 module.exports = class extends Generator {
   prompting() {
@@ -17,37 +22,37 @@ module.exports = class extends Generator {
         choices: [
           {
             name: "Basic Package (Simple reusable module)",
-            value: "basic"
+            value: "basic",
           },
           {
             name: "CLI Tool (Command-line application)",
-            value: "cli"
+            value: "cli",
           },
           {
             name: "Library with API (Reusable library with public API)",
-            value: "library"
-          }
+            value: "library",
+          },
         ],
-        default: "basic"
+        default: "basic",
       },
       {
         type: "input",
         name: "description",
         message: "Package description",
-        default: "A Python package"
+        default: "A Python package",
       },
       {
         type: "input",
         name: "author",
         message: "Author name",
-        default: this.user.git.name()
+        default: this.user.git.name(),
       },
       {
         type: "input",
         name: "email",
         message: "Author email",
-        default: this.user.git.email()
-      }
+        default: this.user.git.email(),
+      },
     ]).then((answers) => {
       this.answers = answers;
       this.packageName = answers.name;
@@ -61,11 +66,16 @@ module.exports = class extends Generator {
       "app/core/__init__.py": "",
       "app/core/config.py": this._generateConfigContent(),
       "app/services/__init__.py": "",
-      [`app/services/${this.answers.name.replace(/-/g, '_')}_service.py`]: this._generateServiceContent(),
+      [`app/services/${this.answers.name.replace(/-/g, "_")}_service.py`]:
+        this._generateServiceContent(),
       "app/repositories/__init__.py": "",
-      [`app/repositories/${this.answers.name.replace(/-/g, '_')}_repository.py`]: this._generateRepositoryContent(),
+      [`app/repositories/${this.answers.name.replace(
+        /-/g,
+        "_"
+      )}_repository.py`]: this._generateRepositoryContent(),
       "app/schemas/__init__.py": "",
-      [`app/schemas/${this.answers.name.replace(/-/g, '_')}.py`]: this._generateSchemaContent(),
+      [`app/schemas/${this.answers.name.replace(/-/g, "_")}.py`]:
+        this._generateSchemaContent(),
       "app/__init__.py": "",
       "app/main.py": this._generateMainContent(),
       "tests/__init__.py": "",
@@ -74,15 +84,42 @@ module.exports = class extends Generator {
       "pyproject.toml": this.generatePyprojectToml(),
       "README.md": this.generateReadme(),
       ".gitignore": this.generateGitignore(),
-      "Makefile": this.generateMakefile(),
+      Makefile: this.generateMakefile(),
       ".env": this._generateEnvFile(),
       ".env.example": this._generateEnvFile(),
-      "Dockerfile": this._generateDockerfile(),
+      Dockerfile: this._generateDockerfile(),
+      "k8s/base/deployment.yaml": this._generateK8sDeployment(),
+      "k8s/base/service.yaml": this._generateK8sService(),
+      "k8s/base/ingress.yaml": this._generateK8sIngress(),
+      "k8s/base/kustomization.yaml": this._generateBaseKustomization(),
+      "k8s/overlays/development/kustomization.yaml":
+        this._generateDevKustomization(),
+      "k8s/overlays/development/patch.yaml": this._generateDevPatch(),
+      "k8s/overlays/production/kustomization.yaml":
+        this._generateProdKustomization(),
+      "k8s/overlays/production/patch.yaml": this._generateProdPatch(),
+      "scripts/setup-dev.sh": this._generateSetupScript(),
+      "scripts/start-local.sh": this._generateStartScript(),
+      "scripts/deploy-k8s.sh": this._generateDeployScript(),
+      "scripts/run-tests.sh": this._generateTestScript(),
+      "docker-compose.yml": this._generateDockerCompose(),
+      ".dockerignore": this._generateDockerignore(),
+      "skaffold.yaml": this._generateSkaffold(),
     };
 
     Object.entries(baseStructure).forEach(([path, content]) => {
       this.fs.write(this.destinationPath(path), content);
     });
+
+    // Make scripts executable using fs
+    const scriptsDir = this.destinationPath("scripts");
+    if (fs.existsSync(scriptsDir)) {
+      const files = fs.readdirSync(scriptsDir);
+      files.forEach((file) => {
+        const filePath = path.join(scriptsDir, file);
+        fs.chmodSync(filePath, "755");
+      });
+    }
   }
 
   generatePyprojectToml() {
@@ -93,17 +130,17 @@ module.exports = class extends Generator {
     const typeSpecificDependencies = {
       cli: {
         click: "^8.1.3",
-        "rich": "^13.4.2"
+        rich: "^13.4.2",
       },
       library: {
-        requests: "^2.31.0"
+        requests: "^2.31.0",
       },
-      basic: {}
+      basic: {},
     };
 
     const dependencies = {
       ...commonDependencies,
-      ...typeSpecificDependencies[this.answers.packageType]
+      ...typeSpecificDependencies[this.answers.packageType],
     };
 
     const depsString = Object.entries(dependencies)
@@ -129,7 +166,11 @@ mypy = "^1.4.1"
 pytest-cov = "^4.1.0"
 pre-commit = "^3.3.3"
 
-${this.answers.packageType === 'cli' ? '[tool.poetry.scripts]\ncli = "' + this.packageName + '.cli:main"\n' : ''}
+${
+  this.answers.packageType === "cli"
+    ? '[tool.poetry.scripts]\ncli = "' + this.packageName + '.cli:main"\n'
+    : ""
+}
 
 [build-system]
 requires = ["poetry-core"]
@@ -202,26 +243,30 @@ __all__ = ["${this.toPascalCase(this.packageName)}"]`;
   }
 
   toPascalCase(str) {
-    if (!str) return ''; 
+    if (!str) return "";
     return str
-      .split('-')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join('');
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join("");
   }
 
   generateReadme() {
     const usageExample = {
-      basic: `from ${this.packageName} import ${this.toPascalCase(this.packageName)}
+      basic: `from ${this.packageName} import ${this.toPascalCase(
+        this.packageName
+      )}
 
 client = ${this.toPascalCase(this.packageName)}()
 result = client.example_method()`,
       cli: `# Install and run from command line
 pip install ${this.packageName}
 ${this.packageName} hello`,
-      library: `from ${this.packageName} import ${this.toPascalCase(this.packageName)}
+      library: `from ${this.packageName} import ${this.toPascalCase(
+        this.packageName
+      )}
 
 client = ${this.toPascalCase(this.packageName)}()
-result = client.example_method()`
+result = client.example_method()`,
     };
 
     return `# ${this.packageName}
@@ -419,9 +464,9 @@ poetry.lock
 .env.development.local
 .env.test.local
 .env.production.local`;
-}
+  }
 
-_generateRouterContent() {
+  _generateRouterContent() {
     return `from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 
@@ -440,9 +485,9 @@ async def health_check():
     Health check endpoint
     """
     return {"status": "healthy"}`;
-}
+  }
 
-_generateConfigContent() {
+  _generateConfigContent() {
     return `from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -459,10 +504,10 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()`;
-}
+  }
 
-_generateServiceContent() {
-    const serviceName = this.answers.name.replace(/-/g, '_');
+  _generateServiceContent() {
+    const serviceName = this.answers.name.replace(/-/g, "_");
     return `from typing import List, Optional
 
 class ${this.toPascalCase(serviceName)}Service:
@@ -475,10 +520,10 @@ class ${this.toPascalCase(serviceName)}Service:
         Example service operation
         """
         return {"message": "Service operation completed"}`;
-}
+  }
 
-_generateRepositoryContent() {
-    const serviceName = this.answers.name.replace(/-/g, '_');
+  _generateRepositoryContent() {
+    const serviceName = this.answers.name.replace(/-/g, "_");
     return `from typing import List, Optional
 
 class ${this.toPascalCase(serviceName)}Repository:
@@ -491,10 +536,10 @@ class ${this.toPascalCase(serviceName)}Repository:
         Example database query
         """
         return {"data": "Query result"}`;
-}
+  }
 
-_generateSchemaContent() {
-    const serviceName = this.answers.name.replace(/-/g, '_');
+  _generateSchemaContent() {
+    const serviceName = this.answers.name.replace(/-/g, "_");
     return `from pydantic import BaseModel
 from typing import Optional, List
 
@@ -508,9 +553,9 @@ class ExampleSchema(BaseModel):
 
     class Config:
         from_attributes = True`;
-}
+  }
 
-_generateMainContent() {
+  _generateMainContent() {
     return `from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .api.routes.router import router
@@ -539,9 +584,9 @@ app.include_router(router, prefix="/api")
 @app.get("/")
 async def root():
     return {"message": f"Welcome to {settings.APP_NAME}"}`;
-}
+  }
 
-_generateConfTestContent() {
+  _generateConfTestContent() {
     return `import pytest
 from fastapi.testclient import TestClient
 from app.main import app
@@ -549,9 +594,9 @@ from app.main import app
 @pytest.fixture
 def client():
     return TestClient(app)`;
-}
+  }
 
-_generateTestContent() {
+  _generateTestContent() {
     return `from fastapi.testclient import TestClient
 
 def test_root_endpoint(client):
@@ -563,9 +608,9 @@ def test_health_check(client):
     response = client.get("/api/health")
     assert response.status_code == 200
     assert response.json()["status"] == "healthy"`;
-}
+  }
 
-_generateEnvFile() {
+  _generateEnvFile() {
     return `# Application Settings
 APP_NAME=${this.packageName}
 DEBUG=True
@@ -579,13 +624,13 @@ SECRET_KEY=your-secret-key-here
 
 # API Settings
 API_VERSION=v1
-API_PREFIX=/api/${this.answers.packageType === 'library' ? 'v1' : ''}
+API_PREFIX=/api/${this.answers.packageType === "library" ? "v1" : ""}
 
 # Logging
 LOG_LEVEL=INFO`;
-}
+  }
 
-_generateDockerfile() {
+  _generateDockerfile() {
     return `FROM python:3.9-slim
 
 WORKDIR /app
@@ -599,5 +644,259 @@ RUN poetry config virtualenvs.create false \
 COPY . .
 
 CMD ["poetry", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]`;
-}
+  }
+
+  _generateK8sDeployment() {
+    return `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${this.answers.name}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${this.answers.name}
+  template:
+    metadata:
+      labels:
+        app: ${this.answers.name}
+    spec:
+      containers:
+      - name: ${this.answers.name}
+        image: ${this.answers.name}:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: ${this.answers.name}-config
+              key: ENVIRONMENT`;
+  }
+
+  _generateK8sService() {
+    return `apiVersion: v1
+kind: Service
+metadata:
+  name: ${this.answers.name}
+spec:
+  selector:
+    app: ${this.answers.name}
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: ClusterIP`;
+  }
+
+  _generateK8sIngress() {
+    return `apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ${this.answers.name}
+spec:
+  rules:
+  - host: ${this.answers.name}.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: ${this.answers.name}
+            port:
+              number: 80`;
+  }
+
+  _generateBaseKustomization() {
+    return `apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- deployment.yaml
+- service.yaml
+- ingress.yaml`;
+  }
+
+  _generateDevKustomization() {
+    return `apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+bases:
+- ../../base
+patchesStrategicMerge:
+- patch.yaml`;
+  }
+
+  _generateProdKustomization() {
+    return `apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+bases:
+- ../../base
+patchesStrategicMerge:
+- patch.yaml`;
+  }
+
+  _generateDevPatch() {
+    return `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${this.answers.name}
+spec:
+  template:
+    spec:
+      containers:
+      - name: ${this.answers.name}
+        env:
+        - name: ENVIRONMENT
+          value: development
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"`;
+  }
+
+  _generateProdPatch() {
+    return `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${this.answers.name}
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+      - name: ${this.answers.name}
+        env:
+        - name: ENVIRONMENT
+          value: production
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "400m"`;
+  }
+
+  _generateSetupScript() {
+    return `#!/bin/bash
+set -e
+
+# Install dependencies
+poetry install
+
+# Setup pre-commit hooks
+poetry run pre-commit install
+
+# Setup local development environment
+if [ ! -f .env ]; then
+    cp .env.example .env
+fi
+
+echo "Development environment setup complete!"`;
+  }
+
+  _generateStartScript() {
+    return `#!/bin/bash
+poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`;
+  }
+
+  _generateDeployScript() {
+    return `#!/bin/bash
+set -e
+
+ENVIRONMENT=\${1:-development}
+
+kubectl apply -k k8s/overlays/$ENVIRONMENT`;
+  }
+
+  _generateTestScript() {
+    return `#!/bin/bash
+set -e
+
+# Run tests with coverage
+poetry run pytest tests/ --cov=app --cov-report=term-missing`;
+  }
+
+  _generateDockerCompose() {
+    return `version: '3.8'
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - ENVIRONMENT=development
+    depends_on:
+      - db
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: ${this.answers.name}
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password`;
+  }
+
+  _generateDockerignore() {
+    return `# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.docker
+
+# Kubernetes
+k8s/
+
+# Documentation
+docs/
+*.md`;
+  }
+
+  _generateSkaffold() {
+    return `apiVersion: skaffold/v2beta28
+kind: Config
+build:
+  artifacts:
+  - image: ${this.answers.name}
+    docker:
+      dockerfile: Dockerfile
+deploy:
+  kustomize:
+    paths:
+    - k8s/overlays/development`;
+  }
 };
