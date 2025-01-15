@@ -105,22 +105,22 @@ module.exports = class extends Generator {
       fs.chmodSync(path.join(scriptsDir, "setup.sh"), "755");
     }
 
-    // Copy Helm chart templates
-    this.fs.copyTpl(
-      this.templatePath("helm/**"),
-      this.destinationPath("helm/"),
-      {
-        serviceName: this.answers.name,
-        description: this.answers.description,
-        author: this.answers.author,
-        email: this.answers.email,
-      },
-      {},
-      { globOptions: { dot: true } }
-    );
-
-    // Create Helm directory if it doesn't exist
+    // First ensure the helm directory exists
     this.fs.copy(this.templatePath("helm"), this.destinationPath("helm"));
+
+    // Copy and process each Helm template file individually
+    const helmTemplates = {
+      "Chart.yaml": this._generateHelmChart(),
+      "values.yaml": this._generateHelmValues(),
+      "templates/_helpers.tpl": this._generateHelmHelpers(),
+      "templates/deployment.yaml": this._generateHelmDeployment(),
+      "templates/service.yaml": this._generateHelmService(),
+      "templates/ingress.yaml": this._generateHelmIngress(),
+    };
+
+    Object.entries(helmTemplates).forEach(([path, content]) => {
+      this.fs.write(this.destinationPath(`helm/${path}`), content);
+    });
   }
 
   generatePyprojectToml() {
@@ -615,6 +615,217 @@ def test_health_check(client):
     return `# Application Settings
 APP_NAME=${this.packageName}
 DEBUG=True # Set to False in production
+`;
+  }
+
+  _generateHelmChart() {
+    return `apiVersion: v2
+name: ${this.answers.name}
+description: ${this.answers.description}
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: ${this.answers.author}
+    email: ${this.answers.email}`;
+  }
+
+  _generateHelmValues() {
+    return `# Default values for ${this.answers.name}
+replicaCount: 1
+
+image:
+  repository: ${this.answers.name}
+  tag: latest
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: ${this.answers.name}.local
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+env:
+  - name: ENVIRONMENT
+    value: development
+  - name: APP_NAME
+    value: ${this.answers.name}
+  - name: DEBUG
+    value: "true"
+
+serviceAccount:
+  create: true
+  name: ""
+
+podAnnotations: {}
+
+securityContext: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}`;
+  }
+
+  _generateHelmHelpers() {
+    const name = this.answers.name;
+    return `{{/*
+Expand the name of the chart.
+*/}}
+{{- define "${name}.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Create a default fully qualified app name.
+*/}}
+{{- define "${name}.fullname" -}}
+{{- if .Values.fullnameOverride }}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- $name := default .Chart.Name .Values.nameOverride }}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create chart name and version as used by the chart label.
+*/}}
+{{- define "${name}.chart" -}}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Common labels
+*/}}
+{{- define "${name}.labels" -}}
+helm.sh/chart: {{ include "${name}.chart" . }}
+{{ include "${name}.selectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/*
+Selector labels
+*/}}
+{{- define "${name}.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "${name}.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}`;
+  }
+
+  _generateHelmDeployment() {
+    const name = this.answers.name;
+    return `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "${name}.fullname" . }}
+  labels:
+    {{- include "${name}.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "${name}.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "${name}.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "${name}.fullname" . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}`;
+  }
+
+  _generateHelmService() {
+    const name = this.answers.name;
+    return `apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "${name}.fullname" . }}
+  labels:
+    {{- include "${name}.labels" . }}
+spec:
+  selector:
+    app.kubernetes.io/name: {{ include "${name}.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000`;
+  }
+
+  _generateHelmIngress() {
+    const name = this.answers.name;
+    return `apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "${name}.fullname" . }}
+  labels:
+    {{- include "${name}.labels" . }}
+spec:
+  rules:
+    - host: {{ .Values.ingress.hosts }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "${name}.fullname" . }}
+                port:
+                  number: 80
 `;
   }
 };
