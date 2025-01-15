@@ -60,67 +60,28 @@ module.exports = class extends Generator {
   }
 
   writing() {
-    const baseStructure = {
-      "app/api/routes/__init__.py": "",
-      "app/api/routes/router.py": this._generateRouterContent(),
-      "app/core/__init__.py": "",
-      "app/core/config.py": this._generateConfigContent(),
-      "app/services/__init__.py": "",
-      [`app/services/${this.answers.name.replace(/-/g, "_")}_service.py`]:
-        this._generateServiceContent(),
-      "app/repositories/__init__.py": "",
-      [`app/repositories/${this.answers.name.replace(
-        /-/g,
-        "_"
-      )}_repository.py`]: this._generateRepositoryContent(),
-      "app/schemas/__init__.py": "",
-      [`app/schemas/${this.answers.name.replace(/-/g, "_")}.py`]:
-        this._generateSchemaContent(),
-      "app/__init__.py": "",
-      "app/main.py": this._generateMainContent(),
-      "tests/__init__.py": "",
-      "tests/conftest.py": this._generateConfTestContent(),
-      "tests/test_api.py": this._generateTestContent(),
-      "pyproject.toml": this.generatePyprojectToml(),
-      "README.md": this.generateReadme(),
-      ".gitignore": this.generateGitignore(),
-      Makefile: this.generateMakefile(),
-      ".env": this._generateEnvFile(),
-      ".env.example": this._generateEnvFile(),
-    };
-
-    Object.entries(baseStructure).forEach(([path, content]) => {
-      this.fs.write(this.destinationPath(path), content);
-    });
+    if (this.answers.packageType === "service") {
+      // Generate service files
+      this._generateServiceFiles();
+    } else {
+      // Generate library files
+      this._generateLibraryFiles();
+    }
 
     // Copy setup script from templates
     this.fs.copy(
       this.templatePath("scripts/setup.sh"),
       this.destinationPath("scripts/setup.sh")
     );
+  }
 
+  end() {
     // Make setup script executable
-    const scriptsDir = this.destinationPath("scripts");
-    if (fs.existsSync(scriptsDir)) {
-      fs.chmodSync(path.join(scriptsDir, "setup.sh"), "755");
+    const setupScript = this.destinationPath("scripts/setup.sh");
+    if (fs.existsSync(setupScript)) {
+      fs.chmodSync(setupScript, 0o755);
+      this.log("Made setup script executable");
     }
-
-    // First ensure the helm directory exists
-    this.fs.copy(this.templatePath("helm"), this.destinationPath("helm"));
-
-    // Copy and process each Helm template file individually
-    const helmTemplates = {
-      "Chart.yaml": this._generateHelmChart(),
-      "values.yaml": this._generateHelmValues(),
-      "templates/_helpers.tpl": this._generateHelmHelpers(),
-      "templates/deployment.yaml": this._generateHelmDeployment(),
-      "templates/service.yaml": this._generateHelmService(),
-      "templates/ingress.yaml": this._generateHelmIngress(),
-    };
-
-    Object.entries(helmTemplates).forEach(([path, content]) => {
-      this.fs.write(this.destinationPath(`helm/${path}`), content);
-    });
   }
 
   generatePyprojectToml() {
