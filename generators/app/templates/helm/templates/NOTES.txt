@@ -1,0 +1,21 @@
+Thank you for installing {{ .Chart.Name }}.
+
+Your service has been deployed with the following configuration:
+- Name: {{ include "app.fullname" . }}
+- Namespace: {{ .Release.Namespace }}
+- Port: {{ .Values.service.port }}
+
+To access your service:
+
+1. Using port-forward:
+   kubectl port-forward svc/{{ include "app.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }} -n {{ .Release.Namespace }}
+
+2. Using minikube:
+   minikube service {{ include "app.fullname" . }} -n {{ .Release.Namespace }}
+
+API Documentation: http://localhost:{{ .Values.service.port }}/docs
+Health Check: http://localhost:{{ .Values.service.port }}/health
+
+For more information, see the README.md file in your service directory.
+
+

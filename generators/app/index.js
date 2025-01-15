@@ -2,8 +2,8 @@
 const Generator = require("yeoman-generator");
 const chalk = require("chalk");
 const path = require("path");
-const fs = require("fs");
 const mkdirp = require("mkdirp");
+const fs = require("fs").promises;
 
 // Suppress shelljs warning
 process.env.SUPPRESS_NO_CONFIG_WARNING = "true";
@@ -20,9 +20,15 @@ module.exports = class extends Generator {
         type: "input",
         name: "name",
         message: "Your microservice name",
-        default: path.basename(process.cwd()),
-        validate: (input) =>
-          /^[a-zA-Z][a-zA-Z0-9-]*$/.test(input) || "Invalid service name",
+        default: this.appname.replace(/\s+/g, "-").toLowerCase(),
+        validate: (input) => {
+          const valid = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(input);
+          if (!valid) {
+            return "Name must consist of lowercase letters, numbers, and hyphens, and must start and end with an alphanumeric character";
+          }
+          return true;
+        },
+        filter: (input) => input.toLowerCase(),
       },
       {
         type: "input",
@@ -33,27 +39,46 @@ module.exports = class extends Generator {
       {
         type: "input",
         name: "author",
-        message: "Author name",
-        default: this.user.git.name(),
+        message: "Author name (full name)",
+        validate: (input) => {
+          if (!input || input.length < 2) {
+            return "Please enter a valid name";
+          }
+          return true;
+        },
       },
       {
         type: "input",
         name: "email",
         message: "Author email",
-        default: this.user.git.email(),
+        validate: (input) => {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(input)) {
+            return "Please enter a valid email address";
+          }
+          return true;
+        },
       },
       {
         type: "input",
         name: "port",
         message: "Service port",
         default: "8000",
-        validate: (input) => /^\d+$/.test(input) || "Port must be a number",
+        validate: (input) => {
+          const port = parseInt(input);
+          return port > 0 && port < 65536
+            ? true
+            : "Port must be between 1 and 65535";
+        },
       },
     ]);
 
-    // Derive additional properties
-    this.answers.pythonName = this.answers.name.replace(/-/g, "_");
+    // Ensure we have valid names for different contexts
     this.answers.serviceName = this.answers.name;
+    this.answers.pythonName = this.answers.name.replace(/-/g, "_");
+
+    // Format author string for pyproject.toml
+    this.answers.authorString = `${this.answers.author} <${this.answers.email}>`;
   }
 
   async writing() {
@@ -62,7 +87,7 @@ module.exports = class extends Generator {
       year: new Date().getFullYear(),
     };
 
-    // Create directory structure
+    // Create base directories
     const dirs = [
       "app",
       "app/api",
@@ -74,84 +99,93 @@ module.exports = class extends Generator {
       "scripts",
     ];
 
-    // Create directories using mkdirp
     for (const dir of dirs) {
       await mkdirp(this.destinationPath(dir));
     }
 
-    // Copy files
-    await this._copyServiceFiles(templateData);
-    await this._copyKubernetesFiles(templateData);
-    await this._copyDockerFiles(templateData);
-    await this._copyScripts(templateData);
-  }
-
-  async _copyServiceFiles(templateData) {
+    // Copy all files first
     const files = [
-      ["service/app/__init__.py", "app/__init__.py"],
-      ["service/app/main.py", "app/main.py"],
-      ["service/app/core/__init__.py", "app/core/__init__.py"],
-      ["service/app/core/config.py", "app/core/config.py"],
-      ["service/app/api/__init__.py", "app/api/__init__.py"],
-      ["service/app/api/routes/__init__.py", "app/api/routes/__init__.py"],
-      ["service/app/api/routes/router.py", "app/api/routes/router.py"],
-      ["service/tests/__init__.py", "tests/__init__.py"],
-      ["service/tests/test_api.py", "tests/test_api.py"],
-      ["md/readme.md", "README.md"],
-      ["service/pyproject.toml", "pyproject.toml"],
-      ["service/.env", ".env"],
-      ["service/.gitignore", ".gitignore"],
-    ];
+      // Python service files
+      ["app/main.py", "app/main.py"],
+      ["app/__init__.py", "app/__init__.py"],
+      ["app/core/__init__.py", "app/core/__init__.py"],
+      ["app/core/config.py", "app/core/config.py"],
+      ["app/api/__init__.py", "app/api/__init__.py"],
+      ["app/api/routes/__init__.py", "app/api/routes/__init__.py"],
+      ["app/api/routes/router.py", "app/api/routes/router.py"],
+      ["tests/__init__.py", "tests/__init__.py"],
+      ["tests/test_api.py", "tests/test_api.py"],
 
-    await this._copyTemplateFiles(files, templateData);
-  }
+      // Configuration files
+      ["pyproject.toml", "pyproject.toml"],
+      [".env", ".env"],
+      [".gitignore", ".gitignore"],
+      ["readme.md", "README.md"],
 
-  async _copyKubernetesFiles(templateData) {
-    const files = [
-      ["kubernetes/helm/Chart.yaml", "helm/Chart.yaml"],
-      ["kubernetes/helm/values.yaml", "helm/values.yaml"],
-      ["kubernetes/helm/templates/_helpers.tpl", "helm/templates/_helpers.tpl"],
-      [
-        "kubernetes/helm/templates/deployment.yaml",
-        "helm/templates/deployment.yaml",
-      ],
-      ["kubernetes/helm/templates/service.yaml", "helm/templates/service.yaml"],
-      ["kubernetes/helm/templates/ingress.yaml", "helm/templates/ingress.yaml"],
-      ["kubernetes/skaffold.yaml", "skaffold.yaml"],
-    ];
+      // Docker files
+      ["Dockerfile", "Dockerfile"],
+      [".dockerignore", ".dockerignore"],
 
-    await this._copyTemplateFiles(files, templateData);
-  }
+      // Kubernetes/Helm files
+      ["helm/Chart.yaml", "helm/Chart.yaml"],
+      ["helm/values.yaml", "helm/values.yaml"],
+      ["helm/templates/_helpers.tpl", "helm/templates/_helpers.tpl"],
+      ["helm/templates/deployment.yaml", "helm/templates/deployment.yaml"],
+      ["helm/templates/service.yaml", "helm/templates/service.yaml"],
+      ["helm/templates/ingress.yaml", "helm/templates/ingress.yaml"],
+      ["skaffold.yaml", "skaffold.yaml"],
 
-  async _copyDockerFiles(templateData) {
-    const files = [
-      ["docker/Dockerfile", "Dockerfile"],
-      ["docker/.dockerignore", ".dockerignore"],
-    ];
-
-    await this._copyTemplateFiles(files, templateData);
-  }
-
-  async _copyScripts(templateData) {
-    const files = [
+      // Scripts
       ["scripts/setup.sh", "scripts/setup.sh"],
       ["scripts/package-helm.sh", "scripts/package-helm.sh"],
     ];
 
-    await this._copyTemplateFiles(files, templateData);
+    // Copy all files
+    for (const [src, dest] of files) {
+      try {
+        this.fs.copyTpl(
+          this.templatePath(src),
+          this.destinationPath(dest),
+          templateData
+        );
+      } catch (error) {
+        this.log(chalk.red(`Error copying file ${src}: ${error.message}`));
+        throw error;
+      }
+    }
+
+    // Wait for all files to be written
+    await this.fs.commit();
 
     // Make scripts executable
-    fs.chmodSync(this.destinationPath("scripts/setup.sh"), 0o755);
-    fs.chmodSync(this.destinationPath("scripts/package-helm.sh"), 0o755);
-  }
+    const scriptsToMakeExecutable = [
+      "scripts/setup.sh",
+      "scripts/package-helm.sh",
+    ];
 
-  async _copyTemplateFiles(files, templateData) {
-    for (const [src, dest] of files) {
-      this.fs.copyTpl(
-        this.templatePath(src),
-        this.destinationPath(dest),
-        templateData
-      );
+    for (const script of scriptsToMakeExecutable) {
+      const scriptPath = this.destinationPath(script);
+      try {
+        await fs.chmod(scriptPath, 0o755);
+        this.log(chalk.green(`Made ${script} executable`));
+      } catch (error) {
+        this.log(
+          chalk.red(`Error making ${script} executable: ${error.message}`)
+        );
+        // Try alternative method
+        try {
+          require("child_process").execSync(`chmod +x "${scriptPath}"`);
+          this.log(
+            chalk.green(`Made ${script} executable using chmod command`)
+          );
+        } catch (cmdError) {
+          this.log(
+            chalk.red(
+              `Failed to make ${script} executable: ${cmdError.message}`
+            )
+          );
+        }
+      }
     }
   }
 

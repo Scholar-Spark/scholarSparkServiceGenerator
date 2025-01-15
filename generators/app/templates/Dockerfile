@@ -1,5 +1,5 @@
 # Build stage
-FROM python:3.9-slim as builder
+FROM python:3.11-slim as builder
 
 WORKDIR /app
 
@@ -9,17 +9,20 @@ RUN pip install poetry
 # Copy dependency files
 COPY pyproject.toml poetry.lock* ./
 
+# Copy application code
+COPY . .
+
 # Configure poetry and install dependencies
 RUN poetry config virtualenvs.create false \
-    && poetry install --no-dev --no-interaction --no-ansi
+    && poetry install --only main --no-interaction --no-ansi --no-root
 
 # Runtime stage
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
 # Copy only necessary files from builder
-COPY --from=builder /usr/local/lib/python3.9/site-packages/ /usr/local/lib/python3.9/site-packages/
+COPY --from=builder /usr/local/lib/python3.11/site-packages/ /usr/local/lib/python3.11/site-packages/
 COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
 # Copy application code

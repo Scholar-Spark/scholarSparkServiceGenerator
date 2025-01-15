@@ -1,0 +1,29 @@
+apiVersion: skaffold/v4beta5
+kind: Config
+metadata:
+  name: <%= serviceName %>
+
+build:
+  artifacts:
+    - image: <%= serviceName %>
+      context: .
+      docker:
+        dockerfile: Dockerfile
+
+deploy:
+  helm:
+    releases:
+      - name: <%= serviceName %>
+        chartPath: helm
+        valuesFiles:
+          - helm/values.yaml
+        setValues:
+          image.repository: <%= serviceName %>
+          image.tag: latest
+
+portForward:
+  - resourceType: service
+    resourceName: <%= serviceName %>
+    namespace: scholar-spark-dev
+    port: <%= port %>
+    localPort: <%= port %>
