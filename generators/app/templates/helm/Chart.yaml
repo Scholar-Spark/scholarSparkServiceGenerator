@@ -1,0 +1,9 @@
+apiVersion: v2
+name: <%= serviceName %>
+description: <%= description %>
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: <%= author %>
+    email: <%= email %>

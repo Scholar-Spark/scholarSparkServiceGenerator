@@ -104,6 +104,23 @@ module.exports = class extends Generator {
     if (fs.existsSync(scriptsDir)) {
       fs.chmodSync(path.join(scriptsDir, "setup.sh"), "755");
     }
+
+    // Copy Helm chart templates
+    this.fs.copyTpl(
+      this.templatePath("helm/**"),
+      this.destinationPath("helm/"),
+      {
+        serviceName: this.answers.name,
+        description: this.answers.description,
+        author: this.answers.author,
+        email: this.answers.email,
+      },
+      {},
+      { globOptions: { dot: true } }
+    );
+
+    // Create Helm directory if it doesn't exist
+    this.fs.copy(this.templatePath("helm"), this.destinationPath("helm"));
   }
 
   generatePyprojectToml() {
@@ -597,20 +614,7 @@ def test_health_check(client):
   _generateEnvFile() {
     return `# Application Settings
 APP_NAME=${this.packageName}
-DEBUG=True
-ENVIRONMENT=development
-
-# Database Settings
-DATABASE_URL=postgresql://user:password@localhost:5432/${this.packageName}
-
-# Security Settings
-SECRET_KEY=your-secret-key-here
-
-# API Settings
-API_VERSION=v1
-API_PREFIX=/api/${this.answers.packageType === "library" ? "v1" : ""}
-
-# Logging
-LOG_LEVEL=INFO`;
+DEBUG=True # Set to False in production
+`;
   }
 };
