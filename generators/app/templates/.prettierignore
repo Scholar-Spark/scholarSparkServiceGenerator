@@ -1,0 +1,9 @@
+# Helm & Kubernetes
+*.yaml
+helm/**/*.yaml
+helm/**/*.yml
+helm/**/templates/*
+**/*.tpl
+
+# Keep prettier enabled for other YAML files by explicitly including them
+!.prettierrc.yaml

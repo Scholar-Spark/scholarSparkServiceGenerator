@@ -138,6 +138,10 @@ module.exports = class extends Generator {
       // Scripts
       ["scripts/setup.sh", "scripts/setup.sh"],
       ["scripts/package-helm.sh", "scripts/package-helm.sh"],
+
+      // Prettier ignore
+      [".prettierignore", ".prettierignore"],
+      [".editorconfig", ".editorconfig"],
     ];
 
     // Copy all files
