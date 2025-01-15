@@ -16,14 +16,14 @@ importers:
         version: 0.8.5
       yeoman-generator:
         specifier: ^5.9.0
-        version: 5.10.0(encoding@0.1.13)(mem-fs@1.2.0)(yeoman-environment@1.6.6)
+        version: 5.9.0(encoding@0.1.13)(mem-fs@1.2.0)(yeoman-environment@1.6.6)
     devDependencies:
       yeoman-assert:
         specifier: ^3.1.1
         version: 3.1.1
       yeoman-test:
         specifier: ^6.3.0
-        version: 6.3.0(mem-fs@1.2.0)(yeoman-environment@1.6.6)(yeoman-generator@5.10.0(encoding@0.1.13)(mem-fs@1.2.0)(yeoman-environment@1.6.6))
+        version: 6.3.0(mem-fs@1.2.0)(yeoman-environment@1.6.6)(yeoman-generator@5.9.0(encoding@0.1.13)(mem-fs@1.2.0)(yeoman-environment@1.6.6))
 
 packages:
 
@@ -1506,8 +1506,8 @@ packages:
   yeoman-environment@1.6.6:
     resolution: {integrity: sha512-Sg0mCm/MhMc7QBQb8KhQqQIdL8olccyNUCK0N2KFHI9PYmwEN/vS23xv2JZgr2C0zl0ZkrrXH2lPJOLvLycftg==}
 
-  yeoman-generator@5.10.0:
-    resolution: {integrity: sha512-iDUKykV7L4nDNzeYSedRmSeJ5eMYFucnKDi6KN1WNASXErgPepKqsQw55TgXPHnmpcyOh2Dd/LAZkyc+f0qaAw==}
+  yeoman-generator@5.9.0:
+    resolution: {integrity: sha512-sN1e01Db4fdd8P/n/yYvizfy77HdbwzvXmPxps9Gwz2D24slegrkSn+qyj+0nmZhtFwGX2i/cH29QDrvAFT9Aw==}
     engines: {node: '>=12.10.0'}
     peerDependencies:
       yeoman-environment: ^3.2.0
@@ -2211,7 +2211,7 @@ snapshots:
 
   humanize-ms@1.2.1:
     dependencies:
-      ms: 2.0.0
+      ms: 2.1.3
 
   iconv-lite@0.4.24:
     dependencies:
@@ -3171,7 +3171,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  yeoman-generator@5.10.0(encoding@0.1.13)(mem-fs@1.2.0)(yeoman-environment@1.6.6):
+  yeoman-generator@5.9.0(encoding@0.1.13)(mem-fs@1.2.0)(yeoman-environment@1.6.6):
     dependencies:
       chalk: 4.1.2
       dargs: 7.0.0
@@ -3196,7 +3196,7 @@ snapshots:
       - mem-fs
       - supports-color
 
-  yeoman-test@6.3.0(mem-fs@1.2.0)(yeoman-environment@1.6.6)(yeoman-generator@5.10.0(encoding@0.1.13)(mem-fs@1.2.0)(yeoman-environment@1.6.6)):
+  yeoman-test@6.3.0(mem-fs@1.2.0)(yeoman-environment@1.6.6)(yeoman-generator@5.9.0(encoding@0.1.13)(mem-fs@1.2.0)(yeoman-environment@1.6.6)):
     dependencies:
       inquirer: 8.2.6
       lodash: 4.17.21
@@ -3205,4 +3205,4 @@ snapshots:
       sinon: 10.0.1
       temp-dir: 2.0.0
       yeoman-environment: 1.6.6
-      yeoman-generator: 5.10.0(encoding@0.1.13)(mem-fs@1.2.0)(yeoman-environment@1.6.6)
+      yeoman-generator: 5.9.0(encoding@0.1.13)(mem-fs@1.2.0)(yeoman-environment@1.6.6)

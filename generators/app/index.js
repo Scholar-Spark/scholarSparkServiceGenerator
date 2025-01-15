@@ -62,10 +62,10 @@ module.exports = class extends Generator {
   writing() {
     if (this.answers.packageType === "service") {
       // Generate service files
-      this._generateServiceFiles();
+      this._generateServiceStructure();
     } else {
       // Generate library files
-      this._generateLibraryFiles();
+      this._generateLibraryStructure();
     }
 
     // Copy setup script from templates
@@ -85,19 +85,22 @@ module.exports = class extends Generator {
   }
 
   generatePyprojectToml() {
+    const authorString = this.answers.email
+      ? `${this.answers.author} <${this.answers.email}>`
+      : `${this.answers.author} <noemail@example.com>`;
+
     const commonDependencies = {
       python: "^3.9",
     };
 
     const typeSpecificDependencies = {
-      cli: {
-        click: "^8.1.3",
-        rich: "^13.4.2",
+      service: {
+        fastapi: "^0.104.1",
+        uvicorn: "^0.24.0",
+        pydantic: "^2.5.2",
+        "pydantic-settings": "^2.1.0",
       },
-      library: {
-        requests: "^2.31.0",
-      },
-      basic: {},
+      library: {},
     };
 
     const dependencies = {
@@ -110,12 +113,12 @@ module.exports = class extends Generator {
       .join("\n");
 
     return `[tool.poetry]
-name = "${this.packageName}"
+name = "${this.answers.name}"
 version = "0.1.0"
 description = "${this.answers.description}"
-authors = ["${this.answers.author} <${this.answers.email}>"]
+authors = ["${authorString}"]
 readme = "README.md"
-packages = [{include = "${this.packageName}", from = "src"}]
+packages = [{include = "${this.answers.name.replace(/-/g, "_")}", from = "src"}]
 
 [tool.poetry.dependencies]
 ${depsString}
@@ -127,12 +130,6 @@ isort = "^5.12.0"
 mypy = "^1.4.1"
 pytest-cov = "^4.1.0"
 pre-commit = "^3.3.3"
-
-${
-  this.answers.packageType === "cli"
-    ? '[tool.poetry.scripts]\ncli = "' + this.packageName + '.cli:main"\n'
-    : ""
-}
 
 [build-system]
 requires = ["poetry-core"]
@@ -788,5 +785,244 @@ spec:
                 port:
                   number: 80
 `;
+  }
+
+  _generateServiceStructure() {
+    const baseStructure = {
+      "app/api/routes/__init__.py": "",
+      "app/api/routes/router.py": this._generateRouterContent(),
+      "pyproject.toml": this._generatePyprojectToml(),
+      "README.md": this._generateReadme(),
+      ".gitignore": this._generateGitignore(),
+    };
+
+    Object.entries(baseStructure).forEach(([path, content]) => {
+      this.fs.write(this.destinationPath(path), content);
+    });
+
+    // Add Docker files
+    this.fs.write(
+      this.destinationPath("Dockerfile"),
+      this._generateDockerfile()
+    );
+
+    this.fs.write(
+      this.destinationPath(".dockerignore"),
+      this._generateDockerignore()
+    );
+
+    // Add Skaffold config
+    this.fs.write(
+      this.destinationPath("skaffold.yaml"),
+      this._generateSkaffold()
+    );
+  }
+
+  _generateLibraryStructure() {
+    const baseStructure = {
+      [`src/${this.answers.name.replace(/-/g, "_")}/__init__.py`]: "",
+      [`src/${this.answers.name.replace(/-/g, "_")}/core.py`]: "",
+      "tests/__init__.py": "",
+      "tests/test_core.py": "",
+      "pyproject.toml": this._generatePyprojectToml(),
+      "README.md": this._generateReadme(),
+      ".gitignore": this._generateGitignore(),
+    };
+
+    Object.entries(baseStructure).forEach(([path, content]) => {
+      this.fs.write(this.destinationPath(path), content);
+    });
+  }
+
+  _generatePyprojectToml() {
+    const authorString = this.answers.email
+      ? `${this.answers.author} <${this.answers.email}>`
+      : `${this.answers.author} <noemail@example.com>`;
+
+    const commonDependencies = {
+      python: "^3.9",
+    };
+
+    const typeSpecificDependencies = {
+      service: {
+        fastapi: "^0.104.1",
+        uvicorn: "^0.24.0",
+        pydantic: "^2.5.2",
+        "pydantic-settings": "^2.1.0",
+      },
+      library: {},
+    };
+
+    const dependencies = {
+      ...commonDependencies,
+      ...typeSpecificDependencies[this.answers.packageType],
+    };
+
+    const depsString = Object.entries(dependencies)
+      .map(([pkg, ver]) => `${pkg} = "${ver}"`)
+      .join("\n");
+
+    return `[tool.poetry]
+  name = "${this.answers.name}"
+  version = "0.1.0"
+  description = "${this.answers.description}"
+  authors = ["${authorString}"]
+  readme = "README.md"
+  packages = [{include = "${this.answers.name.replace(
+    /-/g,
+    "_"
+  )}", from = "src"}]
+  
+  [tool.poetry.dependencies]
+  ${depsString}
+  
+  [tool.poetry.group.dev.dependencies]
+  pytest = "^7.4.0"
+  black = "^23.7.0"
+  isort = "^5.12.0"
+  mypy = "^1.4.1"
+  pytest-cov = "^4.1.0"
+  pre-commit = "^3.3.3"
+  
+  [build-system]
+  requires = ["poetry-core"]
+  build-backend = "poetry.core.masonry.api"
+  
+  [tool.black]
+  line-length = 88
+  target-version = ['py39']
+  include = '\\.pyi?$'
+  
+  [tool.isort]
+  profile = "black"
+  multi_line_output = 3`;
+  }
+
+  _generateReadme() {
+    const usageExample =
+      this.answers.packageType === "service"
+        ? `# Run locally with poetry
+  poetry install
+  poetry run uvicorn app.main:app --reload
+  
+  # Or with Docker
+  docker build -t ${this.answers.name} .
+  docker run -p 8000:8000 ${this.answers.name}
+  
+  # Or with Skaffold
+  skaffold dev`
+        : `# Install with pip
+  pip install ${this.answers.name}
+  
+  # Or with poetry
+  poetry add ${this.answers.name}
+  
+  # Usage
+  from ${this.answers.name.replace(/-/g, "_")} import core`;
+
+    return `# ${this.answers.name}
+  
+  ${this.answers.description}
+  
+  ## Installation
+  
+  \`\`\`bash
+  poetry install
+  \`\`\`
+  
+  ## Usage
+  
+  \`\`\`bash
+  ${usageExample}
+  \`\`\`
+  
+  ## Development
+  
+  1. Clone the repository
+  2. Install dependencies:
+     \`\`\`bash
+     poetry install
+     \`\`\`
+  3. Run tests:
+     \`\`\`bash
+     poetry run pytest
+     \`\`\`
+  
+  ## License
+  
+  MIT`;
+  }
+
+  _generateGitignore() {
+    return `# Python
+  __pycache__/
+  *.py[cod]
+  *$py.class
+  *.so
+  .Python
+  build/
+  develop-eggs/
+  dist/
+  downloads/
+  eggs/
+  .eggs/
+  lib/
+  lib64/
+  parts/
+  sdist/
+  var/
+  wheels/
+  *.egg-info/
+  .installed.cfg
+  *.egg
+  
+  # Virtual Environment
+  .env
+  .venv
+  env/
+  venv/
+  ENV/
+  
+  # IDE
+  .idea/
+  .vscode/
+  *.swp
+  *.swo
+  
+  # Testing
+  .coverage
+  htmlcov/
+  .pytest_cache/
+  .mypy_cache/
+  
+  # Distribution
+  dist/
+  build/
+  
+  # Poetry
+  poetry.lock
+  
+  # Jupyter Notebook
+  .ipynb_checkpoints
+  
+  # pyenv
+  .python-version
+  
+  # Logs
+  *.log
+  
+  # Local development settings
+  .env.local
+  .env.development.local
+  .env.test.local
+  .env.production.local
+  
+  # Docker
+  .docker
+  docker-compose.override.yml
+  
+  # Kubernetes
+  kubeconfig
+  *.kubeconfig`;
   }
 };
