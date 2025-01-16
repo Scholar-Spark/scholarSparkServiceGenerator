@@ -158,6 +158,12 @@ module.exports = class extends Generator {
       }
     }
 
+    // Copy GitHub Actions workflow
+    this.fs.copy(
+      this.templatePath(".github/workflows/helm-release.yml"),
+      this.destinationPath(".github/workflows/helm-release.yml")
+    );
+
     // Wait for all files to be written
     await this.fs.commit();
 

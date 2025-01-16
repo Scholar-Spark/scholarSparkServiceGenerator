@@ -1,0 +1,54 @@
+name: Release Helm Chart
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "helm/**"
+      - ".github/workflows/helm-release.yaml"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Helm
+        uses: helm/setup-helm@v1
+        with:
+          version: latest
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package and Push Chart
+        run: |
+          # Extract the chart name from Chart.yaml
+          CHART_NAME=$(yq eval '.name' helm/Chart.yaml)
+
+          # Package the Helm chart
+          helm package helm/
+
+          # Push to GHCR using OCI registry
+          helm push ${CHART_NAME}-*.tgz oci://ghcr.io/${GITHUB_REPOSITORY,,}/charts
+
+      - name: Output Release Info
+        if: success()
+        run: |
+          CHART_VERSION=$(helm show chart helm/ | grep version | cut -d' ' -f2)
+          CHART_NAME=$(helm show chart helm/ | grep name | cut -d' ' -f2)
+          echo "Successfully published chart ${CHART_NAME} version ${CHART_VERSION}"
+          echo "You can install this chart using:"
+          echo "helm install my-release oci://ghcr.io/${GITHUB_REPOSITORY,,}/charts/${CHART_NAME} --version ${CHART_VERSION}"
