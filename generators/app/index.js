@@ -2,7 +2,7 @@
 const Generator = require("yeoman-generator");
 const chalk = require("chalk");
 const path = require("path");
-const mkdirp = require("mkdirp");
+const { mkdirp } = require("mkdirp");
 const fs = require("fs").promises;
 
 // Suppress shelljs warning
@@ -197,6 +197,25 @@ module.exports = class extends Generator {
         }
       }
     }
+
+    this.fs.copyTpl(this.templatePath(".env"), this.destinationPath(".env"), {
+      port: this.answers.port,
+      name: this.answers.name,
+      pythonName: this.answers.pythonName,
+      organizationName: this.answers.organizationName,
+    });
+
+    // Also create a .env.example
+    this.fs.copyTpl(
+      this.templatePath(".env"),
+      this.destinationPath(".env.example"),
+      {
+        port: this.answers.port,
+        name: this.answers.name,
+        pythonName: this.answers.pythonName,
+        organizationName: this.answers.organizationName,
+      }
+    );
   }
 
   end() {
