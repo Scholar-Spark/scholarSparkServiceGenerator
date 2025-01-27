@@ -24,12 +24,6 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
-.env
-.venv
-env/
-venv/
-ENV/
 
 # IDE
 .idea/
@@ -65,5 +59,4 @@ docs/
 !README.md
 
 # Docker
-Dockerfile
 .dockerignore

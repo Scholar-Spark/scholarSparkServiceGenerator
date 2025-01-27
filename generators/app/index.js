@@ -113,6 +113,7 @@ module.exports = class extends Generator {
       "helm",
       "helm/templates",
       "scripts",
+      ".github/workflows",
     ];
 
     for (const dir of dirs) {
@@ -158,6 +159,12 @@ module.exports = class extends Generator {
       // Prettier ignore
       [".prettierignore", ".prettierignore"],
       [".editorconfig", ".editorconfig"],
+
+      // GitHub Actions workflows - explicitly define the path
+      [
+        ".github/workflows/helm-release.yaml",
+        ".github/workflows/helm-release.yaml",
+      ],
     ];
 
     // Copy all files
@@ -170,15 +177,28 @@ module.exports = class extends Generator {
         );
       } catch (error) {
         this.log(chalk.red(`Error copying file ${src}: ${error.message}`));
+        // Log more details about the error
+        this.log(chalk.yellow(`Source path: ${this.templatePath(src)}`));
+        this.log(
+          chalk.yellow(`Destination path: ${this.destinationPath(dest)}`)
+        );
         throw error;
       }
     }
 
-    // Copy GitHub Actions workflow
-    this.fs.copy(
-      this.templatePath(".github/workflows/helm-release.yml"),
-      this.destinationPath(".github/workflows/helm-release.yml")
-    );
+    // Add explicit logging for GitHub workflow copying
+    this.log(chalk.blue("Copying GitHub workflows..."));
+    try {
+      this.fs.copyTpl(
+        this.templatePath(".github/workflows/helm-release.yaml"),
+        this.destinationPath(".github/workflows/helm-release.yaml"),
+        templateData
+      );
+      this.log(chalk.green("Successfully copied GitHub workflows"));
+    } catch (error) {
+      this.log(chalk.red(`Error copying GitHub workflows: ${error.message}`));
+      throw error;
+    }
 
     // Wait for all files to be written
     await this.fs.commit();
