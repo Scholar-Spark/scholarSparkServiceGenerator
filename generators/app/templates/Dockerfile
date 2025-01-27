@@ -6,15 +6,17 @@ WORKDIR /app
 # Install poetry
 RUN pip install poetry
 
-# Copy dependency files
+# Copy dependency files first
 COPY pyproject.toml poetry.lock* ./
 
-# Copy application code
+# Install dependencies
+RUN poetry install --only main --no-interaction --no-ansi --no-root
+
+# Copy application code later
 COPY . .
 
-# Configure poetry and install dependencies
-RUN poetry config virtualenvs.create false \
-    && poetry install --only main --no-interaction --no-ansi --no-root
+# Install the application
+RUN poetry install --only main --no-interaction --no-ansi
 
 # Runtime stage
 FROM python:3.11-slim
@@ -27,6 +29,9 @@ COPY --from=builder /usr/local/bin/ /usr/local/bin/
 
 # Copy application code
 COPY app/ app/
+
+# Copy environment file for local development
+COPY .env .env
 
 # Set environment variables
 ENV PYTHONPATH=/app
