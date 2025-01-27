@@ -31,12 +31,6 @@ This is a FastAPI microservice built with:
 ./scripts/setup.sh
 ```
 
-2. Start local development with Skaffold:
-
-```bash
-skaffold dev
-```
-
 This will:
 
 - Build the Docker image
@@ -60,6 +54,14 @@ This will:
 │ └── main.py # FastAPI application
 ├── helm/ # Helm chart for Kubernetes deployment
 ├── tests/ # Test suite
+├── scripts/ # Scripts
+├── .github/workflows/helm-release.yaml # GitHub Actions workflow for Helm release
+├── .dockerignore # Docker ignore file
+├── .gitignore # Git ignore file
+├── .prettierignore # Prettier ignore file
+├── .editorconfig # Editorconfig file
+├── .env # Environment variables
+├── .env.example # Environment variables example
 ├── Dockerfile # Container definition
 ├── pyproject.toml # Python dependencies and project metadata
 └── skaffold.yaml # Skaffold configuration
@@ -86,50 +88,26 @@ With coverage:
 poetry run pytest --cov=app
 ```
 
-## Deployment
+## Version Management
 
-### Local Kubernetes
+Before pushing changes to main/master, update the version using verion-updated script in the scripts folder. This will:
 
-The service is configured to run in Kubernetes using Helm and Skaffold.
+1. Update version in pyproject.toml
+2. Update version in helm/Chart.yaml
+3. Update version in app/main.py
+4. Create a git commit and tag
 
-Development mode with hot reload
+Then you should:
 
-skaffold dev
+1. Push changes and tag
+2. git push origin master
+3. git push origin v{version}
 
-One-time deployment
+The GitHub workflow will automatically:
 
-skaffold run
-
-### Production Deployment
-
-1. Package the Helm chart:
-
-```bash
-./scripts/package.sh
-```
-
-2. Deploy to your cluster:
-
-```bash
-helm install <%= name %> oci://${HELM_REGISTRY}/charts/<%= name %> --version <version>
-```
-
-## Configuration
-
-Configuration is handled through environment variables:
-
-| Variable    | Description            | Default     |
-| ----------- | ---------------------- | ----------- |
-| PORT        | Service port           | <%= port %> |
-| LOG_LEVEL   | Logging level          | INFO        |
-| ENVIRONMENT | Deployment environment | development |
-
-## Contributing
-
-1. Create a feature branch
-2. Make your changes
-3. Run tests
-4. Submit a pull request
+1. Detect the version from pyproject.toml
+2. Package the Helm chart with matching version
+3. Push the chart to GitHub Container Registry
 
 ## Maintainers
 

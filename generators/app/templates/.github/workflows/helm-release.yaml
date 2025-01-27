@@ -27,7 +27,6 @@ jobs:
       - name: Get Version from pyproject.toml
         id: version
         run: |
-          # Extract version from pyproject.toml using grep and sed
           VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Using version: ${VERSION}"
@@ -39,7 +38,6 @@ jobs:
 
       - name: Update Helm Chart Version
         run: |
-          # Update Helm Chart version to match pyproject.toml
           yq eval ".version = \"${{ steps.version.outputs.version }}\"" -i helm/Chart.yaml
           yq eval ".appVersion = \"${{ steps.version.outputs.version }}\"" -i helm/Chart.yaml
 
@@ -53,11 +51,7 @@ jobs:
       - name: Package and Push Chart
         run: |
           CHART_NAME=$(yq eval '.name' helm/Chart.yaml)
-
-          # Package the Helm chart
           helm package helm/
-
-          # Push to GHCR using OCI registry
           helm push ${CHART_NAME}-*.tgz oci://ghcr.io/${GITHUB_REPOSITORY,,}/charts
 
       - name: Output Release Info
