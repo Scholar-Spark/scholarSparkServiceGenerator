@@ -153,8 +153,8 @@ module.exports = class extends Generator {
       ["skaffold.yaml", "skaffold.yaml"],
 
       // Scripts
+      ["scripts/version-updater.sh", "scripts/version-updater.sh"],
       ["scripts/setup.sh", "scripts/setup.sh"],
-      ["scripts/package-helm.sh", "scripts/package-helm.sh"],
 
       // Prettier ignore
       [".prettierignore", ".prettierignore"],
@@ -206,7 +206,7 @@ module.exports = class extends Generator {
     // Make scripts executable
     const scriptsToMakeExecutable = [
       "scripts/setup.sh",
-      "scripts/package-helm.sh",
+      "scripts/version-updater.sh",
     ];
 
     for (const script of scriptsToMakeExecutable) {
