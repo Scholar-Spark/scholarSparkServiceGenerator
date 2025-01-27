@@ -71,6 +71,22 @@ module.exports = class extends Generator {
             : "Port must be between 1 and 65535";
         },
       },
+      {
+        type: "input",
+        name: "organizationName",
+        message: "Organization name (for container registry)",
+        default: "my-org",
+        validate: (input) => {
+          const valid = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(
+            input.toLowerCase()
+          );
+          if (!valid) {
+            return "Organization name must consist of lowercase letters, numbers, and hyphens, and must start and end with an alphanumeric character";
+          }
+          return true;
+        },
+        filter: (input) => input.toLowerCase(),
+      },
     ]);
 
     // Ensure we have valid names for different contexts
