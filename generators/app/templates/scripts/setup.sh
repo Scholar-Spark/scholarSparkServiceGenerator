@@ -230,15 +230,15 @@ get_service_url() {
     echo "http://localhost:8000"
 }
 
-# Print developer-friendly information
+# Function to print developer-friendly information
 print_dev_info() {
     clear
-    echo -e "🚀 ${GREEN}Scholar Spark Development Environment${NC}\n"
+    echo -e "\n🎉 ${GREEN}Scholar Spark Development Environment is Ready!${NC}\n"
     echo -e "📦 ${BLUE}Service: ${GREEN}${SERVICE_NAME}${NC}\n"
     echo -e "🔗 ${BLUE}API Endpoints:${NC}"
-    echo -e "   ${GREEN}→ API:     ${SERVICE_URL}${API_PATH:-/api/v1}"
-    echo -e "   → Docs:    ${SERVICE_URL}/docs"
-    echo -e "   → Health:  ${SERVICE_URL}/health${NC}\n"
+    echo -e "   ${GREEN}→ API:     \033]8;;${SERVICE_URL}${API_PATH:-/api/v1}\033\\${SERVICE_URL}${API_PATH:-/api/v1}\033]8;;\033\\"
+    echo -e "   → Docs:    \033]8;;${SERVICE_URL}/docs\033\\${SERVICE_URL}/docs\033]8;;\033\\"
+    echo -e "   → Health:  \033]8;;${SERVICE_URL}/health\033\\${SERVICE_URL}/health\033]8;;\033\\${NC}\n"
     echo -e "📝 ${BLUE}Development Tips:${NC}"
     echo -e "   ${GREEN}→ Your code changes will automatically reload"
     echo -e "   → API docs are always up-to-date at /docs"
@@ -247,8 +247,8 @@ print_dev_info() {
     echo -e "   ${GREEN}→ CTRL+C to stop the service"
     echo -e "   → ./scripts/dev.sh to restart${NC}\n"
     echo -e "📊 ${BLUE}Monitoring:${NC}"
-    echo -e "   ${GREEN}→ Traces: ${TRACES_ENDPOINT:-http://localhost:3200}"
-    echo -e "   → Logs:   ${LOGS_ENDPOINT:-http://localhost:3100}${NC}\n"
+    echo -e "   ${GREEN}→ Traces: \033]8;;${TRACES_ENDPOINT:-http://localhost:3200}\033\\${TRACES_ENDPOINT:-http://localhost:3200}\033]8;;\033\\"
+    echo -e "   → Logs:   \033]8;;${LOGS_ENDPOINT:-http://localhost:3100}\033\\${LOGS_ENDPOINT:-http://localhost:3100}\033]8;;\033\\${NC}\n"
     echo -e "${YELLOW}Starting development server...${NC}\n"
 }
 
