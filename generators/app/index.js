@@ -252,6 +252,15 @@ module.exports = class extends Generator {
         organizationName: this.answers.organizationName,
       }
     );
+
+    this.fs.copyTpl(
+      this.templatePath("skaffold.yaml"),
+      this.destinationPath("skaffold.yaml"),
+      {
+        serviceName: this.answers.serviceName,
+        port: this.answers.port,
+      }
+    );
   }
 
   end() {
