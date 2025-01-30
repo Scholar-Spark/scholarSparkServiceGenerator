@@ -35,3 +35,15 @@ resources:
     memory: 128Mi
 
 env: {}
+
+development:
+  enabled: true
+  volumes:
+    - name: app-code
+      hostPath:
+        path: ./app
+        type: Directory
+  volumeMounts:
+    - name: app-code
+      mountPath: /app/app
+      readOnly: true

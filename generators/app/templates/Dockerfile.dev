@@ -29,6 +29,9 @@ COPY app/ app/
 COPY .env .env
 
 # Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV WATCHFILES_FORCE_POLLING=false
+ENV PYTHONDONTWRITEBYTECODE=1 
 ENV PYTHONPATH=/app
 ENV PORT=8000
 
@@ -36,4 +39,11 @@ ENV PORT=8000
 EXPOSE 8000
 
 # Run the application with reload enabled
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app"]
+CMD ["uvicorn", "app.main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--reload", \
+     "--reload-dir", "/app", \
+     "--reload-delay", "0", \
+     "--workers", "1", \
+     "--log-level", "warning"]
