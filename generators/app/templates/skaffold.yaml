@@ -8,7 +8,11 @@ build:
     - image: <%= serviceName %>
       context: .
       docker:
-        dockerfile: Dockerfile
+        dockerfile: Dockerfile.dev
+      sync:
+        manual:
+          - src: "app/**/*.py"
+            dest: "/app"
 
 deploy:
   helm:

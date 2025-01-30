@@ -140,6 +140,7 @@ module.exports = class extends Generator {
       ["readme.md", "README.md"],
 
       // Docker files
+      ["Dockerfile.dev", "Dockerfile.dev"],
       ["Dockerfile", "Dockerfile"],
       [".dockerignore", ".dockerignore"],
 

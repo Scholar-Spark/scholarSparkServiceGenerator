@@ -619,6 +619,27 @@ apply_manifest() {
     echo -e "✅ ${GREEN}Successfully applied manifest configuration${NC}"
 }
 
+# Function to handle Docker config issues
+handle_docker_config() {
+    echo -e "${YELLOW}Docker config issue detected. Attempting to fix...${NC}"
+    
+    # Backup existing config if it exists
+    if [ -f "$HOME/.docker/config.json" ]; then
+        echo -e "${BLUE}Backing up existing Docker config...${NC}"
+        cp "$HOME/.docker/config.json" "$HOME/.docker/config.json.backup-$(date +%Y%m%d-%H%M%S)"
+        
+        # Remove corrupted config
+        echo -e "${BLUE}Removing corrupted Docker config...${NC}"
+        rm "$HOME/.docker/config.json"
+        
+        # Restart Docker if possible
+        if command -v systemctl &> /dev/null && systemctl is-active docker &> /dev/null; then
+            echo -e "${BLUE}Restarting Docker service...${NC}"
+            sudo systemctl restart docker
+        fi
+    fi
+}
+
 # Main setup process
 main() {
     # Load environment variables from .env file
@@ -635,48 +656,26 @@ main() {
     cleanup
 
     echo -e "${BLUE}Setting up development environment...${NC}"
-    
-    # Check Docker first
-    check_docker
-    
-    # Detect OS and verify yq installation first
-    OS=$(detect_os)
-    echo -e "${BLUE}Detected OS: $OS${NC}"
-    verify_yq
-    
-    # Install dependencies if needed
-    if [[ ! -x "$(command -v minikube)" ]] || \
-       [[ ! -x "$(command -v kubectl)" ]] || \
-       [[ ! -x "$(command -v skaffold)" ]] || \
-       [[ ! -x "$(command -v helm)" ]] || \
-       [[ ! -x "$(command -v yq)" ]]; then
-        install_dependencies "$OS"
-    fi
-    
+
     # Start minikube if not running
     if ! minikube status &> /dev/null; then
         echo -e "${BLUE}Starting Minikube...${NC}"
-        minikube start --driver=docker
+        # Try to start minikube, handle Docker config issues if they occur
+        if ! minikube start --driver=docker 2>&1 | grep -q "loading config file.*json: cannot unmarshal bool"; then
+            handle_docker_config
+            echo -e "${BLUE}Retrying Minikube start...${NC}"
+            if ! minikube start --driver=docker; then
+                echo -e "${RED}Failed to start Minikube even after fixing Docker config${NC}"
+                exit 1
+            fi
+        fi
     fi
-    
+
     # Configure Docker to use minikube's Docker daemon
     echo -e "${BLUE}Configuring Docker environment...${NC}"
     eval $(minikube docker-env)
-    
-    # Setup Helm registry authentication
-    setup_helm_registry
-    
-    # Setup and apply manifest
-    setup_manifest
-    apply_manifest
-    
-    # Get service URL once and store it
-    SERVICE_URL=$(get_service_url)
-    
-    # Print developer-friendly information
-    print_dev_info
 
-    # Start skaffold
+    # Start skaffold in development mode
     echo -e "${BLUE}Starting Skaffold...${NC}"
     skaffold dev --port-forward
 }
