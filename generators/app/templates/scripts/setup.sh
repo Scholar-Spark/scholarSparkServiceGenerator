@@ -337,24 +337,32 @@ setup_manifest() {
     echo -e "${BLUE}Setting up development manifest...${NC}"
     
     MANIFEST_DIR="$HOME/.scholar-spark/manifest"
-    # Use environment variable with fallback
-    MANIFEST_REPO="${DEV_MANIFEST_REPO:-https://github.com/Polyhistor/scholarSparkDevManifest.gitt}"
+    # Fix typo in URL (remove extra 't')
+    MANIFEST_REPO="${DEV_MANIFEST_REPO:-https://github.com/Polyhistor/scholarSparkDevManifest.git}"
     
     if [ -z "$DEV_MANIFEST_REPO" ]; then
         echo -e "${YELLOW}Warning: DEV_MANIFEST_REPO not set, using default repository${NC}"
     fi
     
-    if [ ! -d "$MANIFEST_DIR" ]; then
+    # Check if directory exists and is a valid git repository
+    if [ -d "$MANIFEST_DIR/.git" ] && git -C "$MANIFEST_DIR" rev-parse --git-dir > /dev/null 2>&1; then
+        echo -e "${BLUE}Updating manifest repository...${NC}"
+        if ! git -C "$MANIFEST_DIR" pull; then
+            echo -e "${YELLOW}Failed to update repository, attempting to re-clone...${NC}"
+            rm -rf "$MANIFEST_DIR"
+            mkdir -p "$MANIFEST_DIR"
+            git clone "$MANIFEST_REPO" "$MANIFEST_DIR" || {
+                echo -e "${RED}Failed to clone manifest repository${NC}"
+                exit 1
+            }
+        fi
+    else
+        # Directory doesn't exist or is not a valid git repo
         echo -e "${BLUE}Cloning manifest repository...${NC}"
+        rm -rf "$MANIFEST_DIR"  # Clean up any existing invalid directory
         mkdir -p "$MANIFEST_DIR"
         git clone "$MANIFEST_REPO" "$MANIFEST_DIR" || {
             echo -e "${RED}Failed to clone manifest repository${NC}"
-            exit 1
-        }
-    else
-        echo -e "${BLUE}Updating manifest repository...${NC}"
-        git -C "$MANIFEST_DIR" pull || {
-            echo -e "${RED}Failed to update manifest repository${NC}"
             exit 1
         }
     fi
