@@ -668,11 +668,26 @@ main() {
     # Start minikube if not running
     if ! minikube status &> /dev/null; then
         echo -e "${BLUE}Starting Minikube...${NC}"
-        # Try to start minikube, handle Docker config issues if they occur
-        if ! minikube start --driver=docker 2>&1 | grep -q "loading config file.*json: cannot unmarshal bool"; then
+        # Try to start minikube with optimized configuration
+        if ! minikube start \
+            --driver=docker \
+            --docker-opt dns=8.8.8.8 \
+            --docker-opt dns=8.8.4.4 \
+            --insecure-registry "10.0.0.0/24" \
+            --registry-mirror=https://mirror.gcr.io \
+            --registry-mirror=https://registry-1.docker.io \
+            2>&1 | grep -q "loading config file.*json: cannot unmarshal bool"; then
+            
             handle_docker_config
-            echo -e "${BLUE}Retrying Minikube start...${NC}"
-            if ! minikube start --driver=docker; then
+            echo -e "${BLUE}Retrying Minikube start with optimized configuration...${NC}"
+            
+            if ! minikube start \
+                --driver=docker \
+                --docker-opt dns=8.8.8.8 \
+                --docker-opt dns=8.8.4.4 \
+                --insecure-registry "10.0.0.0/24" \
+                --registry-mirror=https://mirror.gcr.io \
+                --registry-mirror=https://registry-1.docker.io; then
                 echo -e "${RED}Failed to start Minikube even after fixing Docker config${NC}"
                 exit 1
             fi
