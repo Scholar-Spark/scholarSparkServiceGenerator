@@ -338,7 +338,7 @@ setup_manifest() {
     
     MANIFEST_DIR="$HOME/.scholar-spark/manifest"
     # Fix typo in URL (remove extra 't')
-    MANIFEST_REPO="${DEV_MANIFEST_REPO:-https://github.com/Polyhistor/scholarSparkDevManifest.git}"
+    MANIFEST_REPO="${DEV_MANIFEST_REPO:-https://github.com/Scholar-Spark/scholarSparkServiceGenerator}"
     
     if [ -z "$DEV_MANIFEST_REPO" ]; then
         echo -e "${YELLOW}Warning: DEV_MANIFEST_REPO not set, using default repository${NC}"
