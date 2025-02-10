@@ -13,6 +13,25 @@ A Yeoman generator for creating microservices with ease.
 
 ## Installation
 
+**GOTCHA:** Please make sure you follow this order when you change your branch, do not use environment managers or other package managers. Bear in mind that you need to first install the dependencies of the generator and then link it to the global node_modules using NPM link. If you only link to the global node_modules, you will not be able to run the generator and you will get the following error:
+
+```
+✖️ An error occured while running scholarspark-service:app#writing
+Error
+
+mkdirp is not a function
+
+     _-----_     ╭───────────────────────╮
+    |       |    │      Bye from us!     │
+    |--(o)--|    │       Chat soon.      │
+   `---------´   │      Yeoman team      │
+    ( _´U`_ )    │    http://yeoman.io   │
+    /___A___\   /╰───────────────────────╯
+     |  ~  |
+   __'.___.'__
+ ´   `  |° ´ Y `
+```
+
 1. **Clone the Repository**: Clone the generator repository to your local machine.
 
    ```bash
