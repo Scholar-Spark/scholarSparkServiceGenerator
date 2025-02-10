@@ -13,7 +13,7 @@ A Yeoman generator for creating microservices with ease.
 
 ## Installation
 
-**GOTCHA:** Please make sure you follow this order when you change your branch, do not use environment managers or other package managers. Bear in mind that you need to first install the dependencies of the generator and then link it to the global node_modules using NPM link. If you only link to the global node_modules, you will not be able to run the generator and you will get the following error:
+**GOTCHA:** Please make sure you follow the order discussed below stricly. When you change your branch, do not use environment managers or other package managers. Bear in mind that you need to first install the dependencies of the generator and then link it to the global node_modules using NPM link. If you only link to the global node_modules, you will not be able to run the generator and you will get the following error:
 
 ```
 ✖️ An error occured while running scholarspark-service:app#writing
