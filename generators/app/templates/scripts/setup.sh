@@ -7,6 +7,24 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Add this function near the top of the file, after the color definitions
+print_logo() {
+    clear
+    echo -e "${BLUE}
+   _____ _           _             _____                  _    
+  / ____| |         | |           / ____|                | |   
+ | (___ | |__   ___ | | __ _ _ __| (___  _ __   __ _ _ __| | __
+  \___ \| '_ \ / _ \| |/ _\` | '__\___ \| '_ \ / _\` | '__| |/ /
+  ____) | | | | (_) | | (_| | |  ____) | |_) | (_| | |  |   < 
+ |_____/|_| |_|\___/|_|\__,_|_| |_____/| .__/ \__,_|_|  |_|\_\\
+                                        | |                    
+                                        |_|                    
+${NC}"
+    echo -e "${BLUE}===================================================${NC}"
+    echo -e "${YELLOW}    Scholar Spark Development Environment Setup${NC}"
+    echo -e "${BLUE}===================================================${NC}\n"
+}
+
 # Function to cleanup resources
 cleanup() {
     echo -e "\n🧹 ${BLUE}Cleaning up resources...${NC}"
@@ -70,18 +88,25 @@ get_project_name() {
 SERVICE_NAME=$(get_project_name)
 echo -e "${BLUE}Detected service: ${SERVICE_NAME}${NC}"
 
-# Function to detect OS and distribution
+# Function to detect OS
 detect_os() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
         echo "macos"
-    elif [[ -f /etc/os-release ]]; then
-        # shellcheck disable=SC1091
-        source /etc/os-release
-        echo "$ID"
+    elif [[ -f /etc/debian_version ]]; then
+        echo "debian"
+    elif [[ -f /etc/fedora-release ]]; then
+        echo "fedora"
+    elif [[ -f /etc/redhat-release ]]; then
+        echo "rhel"
+    elif [[ -f /etc/arch-release ]]; then
+        echo "arch"
     else
         echo "unknown"
     fi
 }
+
+# Get OS type
+OS=$(detect_os)
 
 # Function to install dependencies based on OS
 install_dependencies() {
@@ -436,21 +461,27 @@ apply_manifest() {
     
     echo -e "🔍 ${BLUE}Reading manifest configuration...${NC}"
     
-    # Debug: Print manifest content and yq version
-    echo -e "📄 ${BLUE}Manifest content:${NC}"
-    cat "$MANIFEST_FILE"
-    echo -e "\n🔧 ${BLUE}Using yq version:${NC}"
-    $YQ_PATH --version
+    # Create a temporary file for the processed manifest
+    TMP_MANIFEST=$(mktemp)
+    
+    # Replace variables in manifest
+    sed -e "s/\${environment}/development/g" \
+        -e "s/\${organisation}/scholar-spark/g" \
+        "$MANIFEST_FILE" > "$TMP_MANIFEST"
+    
+    echo -e "📄 ${BLUE}Processed manifest content:${NC}"
+    cat "$TMP_MANIFEST"
     
     # Validate manifest structure
-    if ! $YQ_PATH -r '.' "$MANIFEST_FILE" > /dev/null 2>&1; then
+    if ! $YQ_PATH -r '.' "$TMP_MANIFEST" > /dev/null 2>&1; then
         echo -e "${RED}Invalid YAML structure in manifest file${NC}"
+        rm -f "$TMP_MANIFEST"
         exit 1
     fi
     
-    # Parse namespace from manifest with v3 syntax
+    # Parse namespace from manifest
     echo -e "\n🔍 ${BLUE}Parsing namespace...${NC}"
-    NAMESPACE=$($YQ_PATH -r '.["dev-environment"].namespace' "$MANIFEST_FILE")
+    NAMESPACE=$($YQ_PATH -r '.["dev-environment"].namespace' "$TMP_MANIFEST")
     echo -e "📍 ${BLUE}Using namespace: $NAMESPACE${NC}"
     
     # Create namespace if it doesn't exist
@@ -463,67 +494,35 @@ apply_manifest() {
     echo -e "🚀 ${BLUE}Installing shared infrastructure...${NC}"
     
     echo -e "🔍 ${BLUE}Parsing chart details...${NC}"
-    # Read chart details from manifest with v3 syntax and bracket notation
-    CHART_REPO=$($YQ_PATH -r '.["shared-infrastructure"].charts[0].repository' "$MANIFEST_FILE")
-    echo "Debug: CHART_REPO = $CHART_REPO"
-    
-    CHART_VERSION=$($YQ_PATH -r '.["shared-infrastructure"].charts[0].version' "$MANIFEST_FILE")
-    echo "Debug: CHART_VERSION = $CHART_VERSION"
-    
-    CHART_NAME=$($YQ_PATH -r '.["shared-infrastructure"].charts[0].name' "$MANIFEST_FILE")
-    echo "Debug: CHART_NAME = $CHART_NAME"
-    
-    # Debug: Print full YAML structure
-    echo -e "\n📄 ${BLUE}Full YAML structure:${NC}"
-    $YQ_PATH -r '.' "$MANIFEST_FILE"
+    CHART_REPO=$($YQ_PATH -r '.["shared-infrastructure"].charts[0].repository' "$TMP_MANIFEST")
+    CHART_VERSION=$($YQ_PATH -r '.["shared-infrastructure"].charts[0].version' "$TMP_MANIFEST")
+    CHART_NAME=$($YQ_PATH -r '.["shared-infrastructure"].charts[0].name' "$TMP_MANIFEST")
     
     # Verify values exist
     if [ -z "$CHART_REPO" ] || [ -z "$CHART_VERSION" ] || [ -z "$CHART_NAME" ]; then
-        echo -e "${RED}Failed to parse chart information. Please check the manifest structure:${NC}"
-        echo -e "Expected structure:"
-        echo -e "shared-infrastructure:"
-        echo -e "  charts:"
-        echo -e "  - repository: <value>"
-        echo -e "    version: <value>"
-        echo -e "    name: <value>"
+        echo -e "${RED}Failed to parse chart information. Please check the manifest structure${NC}"
+        rm -f "$TMP_MANIFEST"
         exit 1
     fi
     
     echo -e "📥 ${BLUE}Pulling chart: $CHART_NAME (version $CHART_VERSION)${NC}"
     echo -e "   ${BLUE}From: $CHART_REPO${NC}"
     
-    # Ensure we're using minikube context
-    echo -e "🔄 ${BLUE}Switching to minikube context...${NC}"
-    kubectl config use-context minikube || {
-        echo -e "${RED}Failed to switch to minikube context${NC}"
-        exit 1
-    }
-    
     # Pull chart with explicit output file
     CHART_FILE="$CHART_NAME-$CHART_VERSION.tgz"
     if ! helm pull "$CHART_REPO/$CHART_NAME" --version "$CHART_VERSION" --destination . ; then
         echo -e "${RED}Failed to pull chart from repository${NC}"
-        echo -e "Repository: $CHART_REPO"
-        echo -e "Chart: $CHART_NAME"
-        echo -e "Version: $CHART_VERSION"
-        exit 1
-    fi
-    
-    # Verify chart file exists
-    if [ ! -f "$CHART_FILE" ]; then
-        echo -e "${RED}Chart file not found: $CHART_FILE${NC}"
-        echo -e "Current directory contents:"
-        ls -la
+        rm -f "$TMP_MANIFEST"
         exit 1
     fi
     
     # Extract values from manifest and create temporary values file
     TMP_VALUES=$(mktemp)
-    $YQ_PATH -r '.["shared-infrastructure"].charts[0].values' "$MANIFEST_FILE" > "$TMP_VALUES"
+    $YQ_PATH -r '.["shared-infrastructure"].charts[0].values' "$TMP_MANIFEST" > "$TMP_VALUES"
     
     echo -e "⚙️  ${BLUE}Installing chart with custom values...${NC}"
     
-    # Install/upgrade the chart with explicit chart file path and increased timeout
+    # Install/upgrade the chart
     helm upgrade --install "$CHART_NAME" "./$CHART_FILE" \
         --namespace "$NAMESPACE" \
         --values "$TMP_VALUES" \
@@ -531,97 +530,15 @@ apply_manifest() {
         --wait \
         --debug || {
         echo -e "${RED}Failed to install chart${NC}"
-        
-        # Debug Loki deployment specifically
-        echo -e "\n${YELLOW}Checking Loki deployment:${NC}"
-        kubectl describe deployment loki -n "$NAMESPACE"
-        
-        # Debug Loki pod status
-        echo -e "\n${YELLOW}Checking Loki pod status:${NC}"
-        kubectl get pods -n "$NAMESPACE" -l app=${LOGGING_APP:-loki} -o wide
-        
-        # Get Loki pod events
-        echo -e "\n${YELLOW}Checking Loki pod events:${NC}"
-        LOKI_POD=$(kubectl get pods -n "$NAMESPACE" -l app=${LOGGING_APP:-loki} -o name | head -n 1)
-        if [ ! -z "$LOKI_POD" ]; then
-            kubectl describe "$LOKI_POD" -n "$NAMESPACE"
-        fi
-        
-        # Check Loki pod logs
-        echo -e "\n${YELLOW}Checking Loki pod logs:${NC}"
-        if [ ! -z "$LOKI_POD" ]; then
-            kubectl logs "$LOKI_POD" -n "$NAMESPACE" --all-containers=true || true
-        fi
-        
-        # Check storage requirements
-        echo -e "\n${YELLOW}Checking storage requirements:${NC}"
-        kubectl get pvc -n "$NAMESPACE"
-        kubectl get storageclass
-        
-        # Check resource requirements
-        echo -e "\n${YELLOW}Checking resource requirements:${NC}"
-        kubectl describe nodes | grep -A 10 "Allocated resources"
-        
         rm -f "$TMP_VALUES"
+        rm -f "$TMP_MANIFEST"
         rm -f "./$CHART_FILE"
-        
-        echo -e "\n${RED}Loki deployment failed to become ready. Please check the logs above for details.${NC}"
         exit 1
     }
     
-    # Wait specifically for Loki to be ready
-    echo -e "\n${BLUE}Waiting for Loki to be ready...${NC}"
-    local retries=0
-    local max_retries=30
-    
-    while [ $retries -lt $max_retries ]; do
-        # Get the Loki pod name
-        LOKI_POD=$(kubectl get pods -n "$NAMESPACE" -l app=${LOGGING_APP:-loki} -o name | head -n 1)
-        
-        if [ ! -z "$LOKI_POD" ]; then
-            # Check pod status
-            POD_STATUS=$(kubectl get "$LOKI_POD" -n "$NAMESPACE" -o jsonpath='{.status.phase}')
-            
-            if [ "$POD_STATUS" = "Error" ] || [ "$POD_STATUS" = "CrashLoopBackOff" ]; then
-                echo -e "\n${RED}Loki pod is in $POD_STATUS state. Checking logs:${NC}"
-                kubectl logs "$LOKI_POD" -n "$NAMESPACE" --previous || true
-                echo -e "\n${YELLOW}Pod events:${NC}"
-                kubectl describe "$LOKI_POD" -n "$NAMESPACE" | grep -A 10 "Events:"
-                exit 1
-            fi
-            
-            # Check if pod is ready
-            READY_STATUS=$(kubectl get "$LOKI_POD" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[0].ready}')
-            if [ "$READY_STATUS" = "true" ]; then
-                echo -e "\n${GREEN}Loki is ready!${NC}"
-                break
-            fi
-        fi
-        
-        # Every 5 retries, show status
-        if [ $((retries % 5)) -eq 0 ]; then
-            echo -e "\n${YELLOW}Current Loki status:${NC}"
-            kubectl get pods -n "$NAMESPACE" -l app=${LOGGING_APP:-loki}
-            echo -e "\n${YELLOW}Recent events:${NC}"
-            kubectl get events -n "$NAMESPACE" --field-selector involvedObject.name=loki --sort-by='.lastTimestamp' | tail -n 5
-        fi
-        
-        echo -n "."
-        retries=$((retries + 1))
-        sleep 2
-    done
-    
-    if [ $retries -eq $max_retries ]; then
-        echo -e "\n${RED}Timeout waiting for Loki to be ready${NC}"
-        echo -e "\n${YELLOW}Final pod status:${NC}"
-        kubectl get pods -n "$NAMESPACE" -l app=${LOGGING_APP:-loki}
-        echo -e "\n${YELLOW}Pod logs:${NC}"
-        kubectl logs "$LOKI_POD" -n "$NAMESPACE" --previous || true
-        exit 1
-    fi
-    
     # Cleanup
     rm -f "$TMP_VALUES"
+    rm -f "$TMP_MANIFEST"
     rm -f "./$CHART_FILE"
     
     echo -e "✅ ${GREEN}Successfully applied manifest configuration${NC}"
@@ -648,16 +565,44 @@ handle_docker_config() {
     fi
 }
 
-# Main setup process
-main() {
-    # Load environment variables from .env file
-    if [ -f .env ]; then
-        echo -e "${BLUE}Loading environment variables from .env file...${NC}"
-        export $(cat .env | grep -v '^#' | xargs)
-    else
+# Function to load environment variables
+load_env_vars() {
+    if [ ! -f .env ]; then
         echo -e "${RED}Error: No .env file found. Please create one based on .env.example${NC}"
         exit 1
     fi
+    
+    # Safer env loading with error checking
+    while IFS='=' read -r key value; do
+        # Skip comments and empty lines
+        [[ $key =~ ^#.*$ ]] || [ -z "$key" ] && continue
+        # Trim whitespace and quotes
+        value=$(echo "$value" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^["\x27]//' -e 's/["\x27]$//')
+        export "$key=$value"
+    done < .env
+}
+
+# Main setup process
+main() {
+    print_logo
+    trap handle_interrupt SIGINT SIGTERM
+
+    # Phase 1: System Verification
+    echo -e "${BLUE}${BOLD}Phase 1: System Verification${NC}"
+    SERVICE_NAME=$(get_project_name)
+    
+    # Detect OS
+    OS=$(detect_os)
+    echo -e "${BLUE}Detected OS: $OS${NC}"
+    
+    # Load environment variables from .env file
+    load_env_vars
+
+    # Verify yq installation before proceeding
+    verify_yq || {
+        echo -e "${RED}Failed to verify yq installation${NC}"
+        exit 1
+    }
 
     # Perform initial cleanup
     echo -e "\n🧹 ${BLUE}Performing initial cleanup...${NC}"
@@ -668,35 +613,39 @@ main() {
     # Start minikube if not running
     if ! minikube status &> /dev/null; then
         echo -e "${BLUE}Starting Minikube...${NC}"
-        # Try to start minikube with optimized configuration
         if ! minikube start \
             --driver=docker \
             --docker-opt dns=8.8.8.8 \
             --docker-opt dns=8.8.4.4 \
             --insecure-registry "10.0.0.0/24" \
             --registry-mirror=https://mirror.gcr.io \
-            --registry-mirror=https://registry-1.docker.io \
-            2>&1 | grep -q "loading config file.*json: cannot unmarshal bool"; then
+            --registry-mirror=https://registry-1.docker.io; then
             
             handle_docker_config
-            echo -e "${BLUE}Retrying Minikube start with optimized configuration...${NC}"
-            
-            if ! minikube start \
+            echo -e "${BLUE}Retrying Minikube start...${NC}"
+            minikube start \
                 --driver=docker \
                 --docker-opt dns=8.8.8.8 \
                 --docker-opt dns=8.8.4.4 \
                 --insecure-registry "10.0.0.0/24" \
                 --registry-mirror=https://mirror.gcr.io \
-                --registry-mirror=https://registry-1.docker.io; then
-                echo -e "${RED}Failed to start Minikube even after fixing Docker config${NC}"
+                --registry-mirror=https://registry-1.docker.io || {
+                echo -e "${RED}Failed to start Minikube${NC}"
                 exit 1
-            fi
+            }
         fi
     fi
 
     # Configure Docker to use minikube's Docker daemon
     echo -e "${BLUE}Configuring Docker environment...${NC}"
     eval $(minikube docker-env)
+
+    # Setup Helm registry and manifest
+    setup_helm_registry
+    setup_manifest
+    
+    # Apply manifest configuration
+    apply_manifest
 
     # Start skaffold in development mode
     echo -e "${BLUE}Starting Skaffold...${NC}"
@@ -705,3 +654,4 @@ main() {
 
 # Run main function
 main
+
