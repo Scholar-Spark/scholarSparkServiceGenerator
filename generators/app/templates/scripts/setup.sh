@@ -8,8 +8,9 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-SCRIPT_REPO="https://api.github.com/repos/Scholar-Spark/scholarSparkDevSecrits/contents"
-SCRIPT_PATH="scripts/setup.sh"
+REPO_OWNER="Scholar-Spark"
+REPO_NAME="scholarSparkDevScripts"
+BRANCH="main"  # or whichever branch you want to use
 TOKEN_DIR="$HOME/.scholar-spark"
 TOKEN_FILE="$TOKEN_DIR/github_token"
 
@@ -89,34 +90,69 @@ if [ -z "$GITHUB_TOKEN" ]; then
 fi
 
 # Fetch and execute the main script
-echo -e "${BLUE}Fetching latest setup script...${NC}"
+echo -e "${BLUE}Downloading Scholar-Spark development scripts...${NC}"
 
 if ! command -v curl &> /dev/null; then
     echo -e "${RED}Error: curl is required but not installed${NC}"
     exit 1
 fi
 
-# Create temporary file
-TMP_SCRIPT=$(mktemp)
+# Create a temporary directory
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
 
-# Fetch the script with verbose output for debugging
-echo -e "${BLUE}Attempting to fetch from: $SCRIPT_REPO/$SCRIPT_PATH${NC}"
+# Download the repository archive
+ARCHIVE_URL="https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/tarball/$BRANCH"
+ARCHIVE_FILE="$TMP_DIR/repo.tar.gz"
+
+echo -e "${BLUE}Downloading from: $ARCHIVE_URL${NC}"
 HTTP_RESPONSE=$(curl -sL -w "%{http_code}" \
-    -H "Authorization: token ${GITHUB_TOKEN}" \
+    -H "Authorization: token $GITHUB_TOKEN" \
     -H "Accept: application/vnd.github.v3.raw" \
-    "$SCRIPT_REPO/$SCRIPT_PATH" -o "$TMP_SCRIPT")
+    "$ARCHIVE_URL" -o "$ARCHIVE_FILE")
 
-if [ "$HTTP_RESPONSE" = "200" ]; then
-    echo -e "${GREEN}Successfully fetched latest script${NC}"
-    chmod +x "$TMP_SCRIPT"
-    exec "$TMP_SCRIPT" "$@"
-else
-    echo -e "${RED}Failed to fetch setup script from repository (HTTP $HTTP_RESPONSE)${NC}"
-    echo -e "${RED}URL: $SCRIPT_REPO/$SCRIPT_PATH${NC}"
+if [ "$HTTP_RESPONSE" != "200" ]; then
+    echo -e "${RED}Failed to download repository archive (HTTP $HTTP_RESPONSE)${NC}"
+    echo -e "${RED}URL: $ARCHIVE_URL${NC}"
     echo -e "${YELLOW}Please check:${NC}"
     echo -e "  1. You have access to the Scholar-Spark organization"
-    echo -e "  2. The repository and file path are correct"
-    cat "$TMP_SCRIPT" # This will show the error message from GitHub
-    rm -f "$TMP_SCRIPT"
+    echo -e "  2. The repository and branch names are correct"
+    cat "$ARCHIVE_FILE" # This will show the error message from GitHub
+    rm -f "$ARCHIVE_FILE"
     exit 1
 fi
+
+# Extract the archive
+echo -e "${BLUE}Extracting scripts...${NC}"
+if ! tar -xzf "$ARCHIVE_FILE" -C "$TMP_DIR"; then
+    echo -e "${RED}Failed to extract repository archive${NC}"
+    exit 1
+fi
+
+# Find the extracted directory (GitHub adds a prefix with owner-repo-commit)
+EXTRACT_DIR=$(find "$TMP_DIR" -maxdepth 1 -type d -name "$REPO_OWNER-$REPO_NAME-*" | head -n 1)
+
+if [ -z "$EXTRACT_DIR" ]; then
+    echo -e "${RED}Failed to locate extracted repository${NC}"
+    exit 1
+fi
+
+# Check if setup script exists
+SETUP_SCRIPT="$EXTRACT_DIR/scripts/setup.sh"
+if [ ! -f "$SETUP_SCRIPT" ]; then
+    echo -e "${RED}Setup script not found in the repository${NC}"
+    echo -e "${YELLOW}Expected path: $SETUP_SCRIPT${NC}"
+    echo -e "${YELLOW}Available files:${NC}"
+    find "$EXTRACT_DIR" -type f -name "*.sh" | sort
+    exit 1
+fi
+
+# Make the script executable
+chmod +x "$SETUP_SCRIPT"
+
+# Print success message
+echo -e "${GREEN}Successfully downloaded Scholar-Spark development scripts${NC}"
+echo -e "${BLUE}Executing setup script...${NC}"
+
+# Execute the setup script with all original arguments
+exec "$SETUP_SCRIPT" "$@"
