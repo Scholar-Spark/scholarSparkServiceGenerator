@@ -49,13 +49,15 @@ print_install_instructions() {
 
 # --- Dependency Checks ---
 echo -e "${BLUE}Checking required tools...${NC}"
-REQUIRED_COMMANDS=( "gh" "git" "curl" "tar" "mktemp" )
+REQUIRED_COMMANDS=( "gh" "git" "curl" "tar" "mktemp" "skaffold" "kubectl" )
 INSTALL_URLS=(
     "https://cli.github.com/manual/installation"
     "https://git-scm.com/downloads"
     "https://curl.se/download.html"
     "https://www.gnu.org/software/tar/"
     "Usually part of coreutils"
+    "https://skaffold.dev/docs/install/"
+    "https://kubernetes.io/docs/tasks/tools/"
 )
 
 dependencies_met=true
@@ -74,6 +76,10 @@ fi
 echo -e "${GREEN}All required tools are available.${NC}"
 
 # --- Main Script Logic ---
+
+# Save the original project directory
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+echo -e "${BLUE}Project directory: $PROJECT_DIR${NC}"
 
 # Create a temporary directory securely
 TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'scholar-spark-setup')
@@ -148,6 +154,30 @@ if [ $EXEC_EXIT_CODE -ne 0 ]; then
 else
     echo -e "${GREEN}Downloaded setup script finished successfully.${NC}"
 fi
+
+# --- Start Development Environment with Skaffold ---
+echo -e "${BLUE}------------------------------------------------------${NC}"
+echo -e "${GREEN}Setup completed successfully. Starting development environment...${NC}"
+
+# Return to the original project directory where skaffold.yaml is located
+echo -e "${BLUE}Navigating back to project directory: $PROJECT_DIR${NC}"
+cd "$PROJECT_DIR" || die "Failed to navigate to the main project directory"
+
+echo -e "${BLUE}Checking Kubernetes context...${NC}"
+if ! kubectl config current-context &>/dev/null; then
+    echo -e "${YELLOW}No active Kubernetes context found.${NC}"
+    echo -e "${BLUE}Please ensure you have a running Kubernetes cluster and try again.${NC}"
+    echo -e "${BLUE}You can start development later with: 'skaffold dev'${NC}"
+    exit 0
+fi
+
+echo -e "${GREEN}Kubernetes context found. Starting development environment...${NC}"
+echo -e "${BLUE}------------------------------------------------------${NC}"
+echo -e "${BLUE}Running skaffold dev - Press Ctrl+C to exit${NC}"
+echo -e "${BLUE}------------------------------------------------------${NC}"
+
+# Run skaffold dev in the foreground
+skaffold dev
 
 # Explicit exit (trap will clean up)
 exit 0
