@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# --- Configuration ---
 # Colors for output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -7,152 +8,146 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Configuration
+# Repository details
 REPO_OWNER="Scholar-Spark"
-REPO_NAME="scholarSparkDevScripts"
-BRANCH="main"  # or whichever branch you want to use
-TOKEN_DIR="$HOME/.scholar-spark"
-TOKEN_FILE="$TOKEN_DIR/github_token"
+REPO_NAME="scholarSparkDevSecrits" # Make sure this is the correct name
+TARGET_SETUP_SCRIPT_PATH="scripts/setup.sh" # Relative path within the repo
 
-# Function to create GitHub token
-create_github_token() {
-    echo -e "${BLUE}Creating GitHub token for Scholar-Spark development...${NC}"
-    
-    # Check if gh CLI is installed
-    if ! command -v gh &> /dev/null; then
-        echo -e "${YELLOW}GitHub CLI (gh) not found. Installing...${NC}"
-        
-        # Install gh CLI based on OS
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            brew install gh
-        elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-            # Check for common package managers
-            if command -v apt-get &> /dev/null; then
-                curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-                echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-                sudo apt update
-                sudo apt install gh
-            elif command -v dnf &> /dev/null; then
-                sudo dnf install 'dnf-command(config-manager)'
-                sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
-                sudo dnf install gh
-            else
-                echo -e "${RED}Unable to install GitHub CLI. Please install manually: https://github.com/cli/cli#installation${NC}"
-                exit 1
-            fi
-        else
-            echo -e "${RED}Unsupported operating system${NC}"
-            exit 1
-        fi
-    fi
+# --- Helper Functions ---
 
-    # Ensure gh is logged in
-    if ! gh auth status &> /dev/null; then
-        echo -e "${BLUE}Please login to GitHub...${NC}"
-        gh auth login -s "repo" -w
-    fi
-
-    # Create a new token with necessary scopes
-    echo -e "${BLUE}Creating new GitHub token...${NC}"
-    TOKEN=$(gh auth token)
-    
-    # Save token
-    mkdir -p "$TOKEN_DIR"
-    echo "$TOKEN" > "$TOKEN_FILE"
-    chmod 600 "$TOKEN_FILE"
-    
-    echo -e "${GREEN}Successfully created and stored GitHub token${NC}"
-    return 0
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
 }
 
-# Function to get GitHub token
-get_github_token() {
-    # Check if token exists and is valid
-    if [ -f "$TOKEN_FILE" ]; then
-        TOKEN=$(cat "$TOKEN_FILE")
-        # Verify token is valid
-        if curl -s -H "Authorization: token $TOKEN" https://api.github.com/user &> /dev/null; then
-            echo "$TOKEN"
-            return 0
-        fi
-    fi
-    
-    # If we get here, we need to create a new token
-    create_github_token
-    cat "$TOKEN_FILE"
+# Function to print error messages and exit
+die() {
+    echo -e "${RED}Error: $1${NC}" >&2
+    # Clean up temporary directory if it exists
+    # shellcheck disable=SC2154 # TMP_DIR is defined later or globally
+    [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ] && rm -rf "$TMP_DIR"
+    exit 1
 }
 
-# Get or create GitHub token
-GITHUB_TOKEN=$(get_github_token)
-if [ -z "$GITHUB_TOKEN" ]; then
-    echo -e "${RED}Failed to obtain GitHub token${NC}"
-    exit 1
+# Function to print dependency installation instructions
+print_install_instructions() {
+    local cmd="$1"
+    local install_url="$2"
+    echo -e "${YELLOW}Dependency '$cmd' is missing.${NC}"
+    echo -e "${BLUE}Please install it using your system's package manager or visit:${NC}"
+    echo -e "${GREEN}$install_url${NC}"
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo -e "${BLUE}On macOS, you can often use Homebrew: brew install $cmd${NC}"
+    elif command_exists apt-get; then
+        echo -e "${BLUE}On Debian/Ubuntu, try: sudo apt-get update && sudo apt-get install $cmd${NC}"
+    elif command_exists yum; then
+        echo -e "${BLUE}On CentOS/Fedora, try: sudo yum install $cmd${NC}"
+    elif command_exists pacman; then
+        echo -e "${BLUE}On Arch Linux, try: sudo pacman -S $cmd${NC}"
+    fi
+}
+
+# --- Dependency Checks ---
+echo -e "${BLUE}Checking required tools...${NC}"
+REQUIRED_COMMANDS=( "gh" "git" "curl" "tar" "mktemp" )
+INSTALL_URLS=(
+    "https://cli.github.com/manual/installation"
+    "https://git-scm.com/downloads"
+    "https://curl.se/download.html"
+    "https://www.gnu.org/software/tar/"
+    "Usually part of coreutils"
+)
+
+dependencies_met=true
+for i in "${!REQUIRED_COMMANDS[@]}"; do
+    cmd="${REQUIRED_COMMANDS[$i]}"
+    url="${INSTALL_URLS[$i]}"
+    if ! command_exists "$cmd"; then
+        print_install_instructions "$cmd" "$url"
+        dependencies_met=false
+    fi
+done
+
+if [ "$dependencies_met" = false ]; then
+    die "Please install the missing dependencies and re-run the script."
+fi
+echo -e "${GREEN}All required tools are available.${NC}"
+
+# --- Main Script Logic ---
+
+# Create a temporary directory securely
+TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'scholar-spark-setup')
+if [ -z "$TMP_DIR" ]; then
+    die "Failed to create a temporary directory."
+fi
+# Ensure cleanup on exit (including errors)
+trap 'rm -rf "$TMP_DIR"' EXIT SIGINT SIGTERM
+
+# Ensure GitHub CLI Authentication
+echo -e "${BLUE}Checking GitHub CLI authentication...${NC}"
+if ! gh auth status > /dev/null 2>&1; then
+    echo -e "${YELLOW}GitHub CLI needs authentication.${NC}"
+    echo -e "${BLUE}Attempting to initiate GitHub login via browser...${NC}"
+    # Use --web for a browser-based flow, add scopes if needed (e.g., -s repo)
+    if ! gh auth login --web; then
+         die "GitHub CLI authentication failed. Please run 'gh auth login' manually and try again."
+    fi
+    # Re-check status after login attempt
+    if ! gh auth status > /dev/null 2>&1; then
+        die "GitHub CLI authentication still not successful after login attempt."
+    fi
+    echo -e "${GREEN}GitHub CLI authenticated successfully.${NC}"
+else
+    echo -e "${GREEN}GitHub CLI is already authenticated.${NC}"
 fi
 
-# Fetch and execute the main script
-echo -e "${BLUE}Downloading Scholar-Spark development scripts...${NC}"
+# Clone the repository using GitHub CLI
+CLONE_DIR="$TMP_DIR/repo-clone"
+mkdir -p "$CLONE_DIR" || die "Failed to create clone directory '$CLONE_DIR'."
 
-if ! command -v curl &> /dev/null; then
-    echo -e "${RED}Error: curl is required but not installed${NC}"
-    exit 1
+echo -e "${BLUE}Downloading Scholar-Spark development scripts from $REPO_OWNER/$REPO_NAME...${NC}"
+# Clone quietly unless there's an error
+if ! gh repo clone "$REPO_OWNER/$REPO_NAME" "$CLONE_DIR" -- --quiet; then
+    # If quiet fails, try verbose for more info
+    echo -e "${YELLOW}Initial clone attempt failed, retrying with verbose output...${NC}"
+    if ! gh repo clone "$REPO_OWNER/$REPO_NAME" "$CLONE_DIR"; then
+        die "GitHub CLI clone failed. Check repository name ('$REPO_NAME'), your access permissions, and network connection."
+    fi
 fi
+echo -e "${GREEN}Repository cloned successfully to temporary location.${NC}"
 
-# Create a temporary directory
-TMP_DIR=$(mktemp -d)
-trap 'rm -rf "$TMP_DIR"' EXIT
-
-# Download the repository archive
-ARCHIVE_URL="https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/tarball/$BRANCH"
-ARCHIVE_FILE="$TMP_DIR/repo.tar.gz"
-
-echo -e "${BLUE}Downloading from: $ARCHIVE_URL${NC}"
-HTTP_RESPONSE=$(curl -sL -w "%{http_code}" \
-    -H "Authorization: token $GITHUB_TOKEN" \
-    -H "Accept: application/vnd.github.v3.raw" \
-    "$ARCHIVE_URL" -o "$ARCHIVE_FILE")
-
-if [ "$HTTP_RESPONSE" != "200" ]; then
-    echo -e "${RED}Failed to download repository archive (HTTP $HTTP_RESPONSE)${NC}"
-    echo -e "${RED}URL: $ARCHIVE_URL${NC}"
-    echo -e "${YELLOW}Please check:${NC}"
-    echo -e "  1. You have access to the Scholar-Spark organization"
-    echo -e "  2. The repository and branch names are correct"
-    cat "$ARCHIVE_FILE" # This will show the error message from GitHub
-    rm -f "$ARCHIVE_FILE"
-    exit 1
-fi
-
-# Extract the archive
-echo -e "${BLUE}Extracting scripts...${NC}"
-if ! tar -xzf "$ARCHIVE_FILE" -C "$TMP_DIR"; then
-    echo -e "${RED}Failed to extract repository archive${NC}"
-    exit 1
-fi
-
-# Find the extracted directory (GitHub adds a prefix with owner-repo-commit)
-EXTRACT_DIR=$(find "$TMP_DIR" -maxdepth 1 -type d -name "$REPO_OWNER-$REPO_NAME-*" | head -n 1)
-
-if [ -z "$EXTRACT_DIR" ]; then
-    echo -e "${RED}Failed to locate extracted repository${NC}"
-    exit 1
-fi
-
-# Check if setup script exists
-SETUP_SCRIPT="$EXTRACT_DIR/scripts/setup.sh"
+# Check if the target setup script exists in the cloned repo
+SETUP_SCRIPT="$CLONE_DIR/$TARGET_SETUP_SCRIPT_PATH"
 if [ ! -f "$SETUP_SCRIPT" ]; then
-    echo -e "${RED}Setup script not found in the repository${NC}"
-    echo -e "${YELLOW}Expected path: $SETUP_SCRIPT${NC}"
-    echo -e "${YELLOW}Available files:${NC}"
-    find "$EXTRACT_DIR" -type f -name "*.sh" | sort
-    exit 1
+    echo -e "${RED}Target setup script not found in the repository!${NC}" >&2
+    echo -e "${YELLOW}Expected path: '$TARGET_SETUP_SCRIPT_PATH' inside the '$REPO_NAME' repository.${NC}" >&2
+    echo -e "${YELLOW}Listing found *.sh files in the cloned repository root:${NC}" >&2
+    find "$CLONE_DIR" -maxdepth 1 -type f -name "*.sh" -exec basename {} \; >&2
+    die "Cannot proceed without the setup script."
 fi
 
-# Make the script executable
-chmod +x "$SETUP_SCRIPT"
+# Make the target script executable
+chmod +x "$SETUP_SCRIPT" || die "Failed to make setup script executable: $SETUP_SCRIPT"
 
-# Print success message
-echo -e "${GREEN}Successfully downloaded Scholar-Spark development scripts${NC}"
-echo -e "${BLUE}Executing setup script...${NC}"
+# --- Execute Downloaded Script ---
+echo -e "${GREEN}Successfully prepared Scholar-Spark development scripts.${NC}"
+echo -e "${BLUE}Executing the downloaded setup script: $TARGET_SETUP_SCRIPT_PATH${NC}"
+echo -e "${BLUE}------------------------------------------------------${NC}"
 
-# Execute the setup script with all original arguments
-exec "$SETUP_SCRIPT" "$@"
+# Execute the script from within its directory to handle relative paths correctly
+cd "$CLONE_DIR" || die "Failed to change directory to $CLONE_DIR"
+# Pass all arguments received by this script to the target script
+"$SETUP_SCRIPT" "$@"
+EXEC_EXIT_CODE=$?
+
+echo -e "${BLUE}------------------------------------------------------${NC}"
+
+if [ $EXEC_EXIT_CODE -ne 0 ]; then
+    # Use die, which will also trigger the trap cleanup
+    die "The downloaded setup script ($TARGET_SETUP_SCRIPT_PATH) failed with exit code $EXEC_EXIT_CODE."
+else
+    echo -e "${GREEN}Downloaded setup script finished successfully.${NC}"
+fi
+
+# Explicit exit (trap will clean up)
+exit 0
