@@ -22,9 +22,9 @@ deploy:
         createNamespace: true
         setValues:
           image.repository: <%= serviceName %>
-          image.tag: ${IMAGE_TAG}
+          # Ensure image.tag is set by Skaffold's build output
         setValueTemplates:
-          image.tag: ${IMAGE_TAG}
+          image.tag: "{{.IMAGE_TAG}}"
         namespace: scholar-spark-dev
         upgradeOnChange: true
 
