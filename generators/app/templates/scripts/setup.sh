@@ -8,6 +8,10 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Set Skaffold project directory to parent of scripts folder
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export SKAFFOLD_PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
 # Repository details
 REPO_OWNER="Scholar-Spark"
 REPO_NAME="scholarSparkDevSecrits" # Make sure this is the correct name
@@ -154,30 +158,6 @@ if [ $EXEC_EXIT_CODE -ne 0 ]; then
 else
     echo -e "${GREEN}Downloaded setup script finished successfully.${NC}"
 fi
-
-# --- Start Development Environment with Skaffold ---
-echo -e "${BLUE}------------------------------------------------------${NC}"
-echo -e "${GREEN}Setup completed successfully. Starting development environment...${NC}"
-
-# Return to the original project directory where skaffold.yaml is located
-echo -e "${BLUE}Navigating back to project directory: $PROJECT_DIR${NC}"
-cd "$PROJECT_DIR" || die "Failed to navigate to the main project directory"
-
-echo -e "${BLUE}Checking Kubernetes context...${NC}"
-if ! kubectl config current-context &>/dev/null; then
-    echo -e "${YELLOW}No active Kubernetes context found.${NC}"
-    echo -e "${BLUE}Please ensure you have a running Kubernetes cluster and try again.${NC}"
-    echo -e "${BLUE}You can start development later with: 'skaffold dev'${NC}"
-    exit 0
-fi
-
-echo -e "${GREEN}Kubernetes context found. Starting development environment...${NC}"
-echo -e "${BLUE}------------------------------------------------------${NC}"
-echo -e "${BLUE}Running skaffold dev - Press Ctrl+C to exit${NC}"
-echo -e "${BLUE}------------------------------------------------------${NC}"
-
-# Run skaffold dev in the foreground
-skaffold dev
 
 # Explicit exit (trap will clean up)
 exit 0
